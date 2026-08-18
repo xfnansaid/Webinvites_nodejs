@@ -275,11 +275,9 @@ export default function CreatePage() {
               <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-5">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-white/15 backdrop-blur px-2.5 sm:px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest mb-2 sm:mb-3 border border-white/20 shrink-0">
-                    <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Unified ₹399
+                    <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Secure payment method
                   </div>
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-4xl sm:text-5xl md:text-6xl font-display tracking-[-0.03em] leading-none">₹399</span>
-                  </div>
+
                   <p className="text-white/80 text-sm sm:text-base max-w-sm leading-relaxed">
                     Secure Razorpay checkout. Publishes your invitation & generates your unique shareable WhatsApp-ready link.
                   </p>
@@ -310,28 +308,30 @@ export default function CreatePage() {
                   shadow-[0_60px_120px_-20px_rgba(0,0,0,0.35)]
                   rounded-[2.5rem] sm:rounded-[3rem]
                   overflow-hidden
-                  aspect-[9/19]
-                  /* MOBILE: full-screen edge-to-edge; larger breakpoints: fixed sizes */
+                  /* MOBILE: full-screen edge-to-edge with iPhone 12/13/14 aspect (393:852 ≈ 1:2.168) */
+                  aspect-[393/852]
                   w-full
-                  sm:w-[380px]
-                  md:w-[420px]
-                  border-[6px] sm:border-[8px] md:border-[10px] border-[#0d0d0d]
+                  /* DESKTOP (sm+): LOCKED to exact iPhone viewport 393x852 for 1:1 cqw accuracy — do not use 380/420px widths */
+                  sm:w-[393px]
+                  sm:h-[852px]
+                  sm:aspect-auto
+                  border-[6px] sm:border-[10px] border-[#0d0d0d]
                   ring-1 ring-white/10
                 "
               >
                 {/* Status bar */}
-                <div className="absolute top-0 left-0 right-0 h-7 sm:h-8 z-[65] flex items-center justify-between px-4 sm:px-6 text-white/80 text-[10px] sm:text-[11px] font-semibold bg-gradient-to-b from-black/30 to-transparent pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 h-[30px] sm:h-8 z-[65] flex items-center justify-between px-4 sm:px-6 text-white/80 text-[10px] sm:text-[11px] font-semibold bg-gradient-to-b from-black/30 to-transparent pointer-events-none">
                   <span>9:41</span>
                   <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-white/70"></div>
                 </div>
 
                 {/* Dynamic Island */}
-                <div className="absolute top-1.5 sm:top-2 left-1/2 -translate-x-1/2 w-24 sm:w-28 h-5.5 sm:h-7 bg-black rounded-full z-[70] flex items-center justify-center">
+                <div className="absolute top-[6px] sm:top-2 left-1/2 -translate-x-1/2 w-[96px] sm:w-28 h-[22px] sm:h-7 bg-black rounded-full z-[70] flex items-center justify-center">
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#1a1a1a] mr-1.5 sm:mr-2"></div>
                 </div>
 
                 {/* Scrollable Template Content (inline editable, no watermarks) */}
-                <div className="absolute inset-0 overflow-y-auto hide-scrollbar pt-9 sm:pt-10 pb-6 sm:pb-8 [-webkit-overflow-scrolling:touch]">
+                <div className="absolute inset-0 overflow-y-auto hide-scrollbar pt-[38px] sm:pt-[42px] pb-6 sm:pb-8 [-webkit-overflow-scrolling:touch]">
                   <div className="WebInvitesPreviewContainer" style={{ containerType: 'inline-size', width: '100%', maxWidth: '100%' }}><TemplateComponent
                     key={templateId}
                     data={formData}
@@ -342,7 +342,7 @@ export default function CreatePage() {
                 </div>
 
                 {/* Home Indicator */}
-                <div className="absolute bottom-1.5 sm:bottom-2 left-1/2 -translate-x-1/2 w-24 sm:w-28 h-1 rounded-full bg-white/40 z-[70]"></div>
+                <div className="absolute bottom-[6px] sm:bottom-2 left-1/2 -translate-x-1/2 w-[96px] sm:w-28 h-1 rounded-full bg-white/40 z-[70]"></div>
               </div>
 
               {/* Phone Caption */}

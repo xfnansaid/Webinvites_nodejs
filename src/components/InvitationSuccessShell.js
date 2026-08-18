@@ -33,16 +33,40 @@ function prettyWeddingDate(isoDate) {
   });
 }
 
-function buildShareText({ brideName, groomName, weddingDate, venue, shareUrl }) {
-  const dateLine = prettyWeddingDate(weddingDate);
-  const names = [brideName, groomName].filter(Boolean).join(' & ');
-  const parts = [];
-  if (names) parts.push(`💍 ${names}`);
-  if (dateLine) parts.push(`📅 ${dateLine}`);
-  if (venue) parts.push(`📍 ${venue}`);
-  parts.push(`🔗 ${shareUrl}`);
-  parts.push('Your presence will make our day even more special! ❤️');
-  return parts.join('\n');
+function prettyWeddingDateShort(isoDate) {
+  if (!isoDate) return '';
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return String(isoDate);
+  return d.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function buildShareText({ brideName, groomName, weddingDate, venue, venueAddress, shareUrl }) {
+  const bride = (brideName || '').trim();
+  const groom = (groomName || '').trim();
+  const namesUppercase = [bride, groom].filter(Boolean).join(' & ').toUpperCase();
+  const dateFull = prettyWeddingDate(weddingDate);
+  const dateShort = prettyWeddingDateShort(weddingDate);
+  const location = (venueAddress || venue || '').trim();
+  const lines = [];
+
+  lines.push('Warm Greetings ');
+  lines.push('');
+  lines.push('With the grace of the Almighty, we are overjoyed to invite you and your family to the wedding of:');
+  lines.push('');
+  if (namesUppercase) lines.push(`${namesUppercase} `);
+  lines.push('');
+  lines.push(shareUrl);
+  lines.push('');
+  lines.push('Please join us as we celebrate their union and shower them with your blessings as they embark on this beautiful new journey together.');
+  lines.push('');
+  lines.push('');
+  if (dateShort) lines.push(`Date: ${dateShort}`);
+  else if (dateFull) lines.push(`Date: ${dateFull}`);
+  if (location) lines.push(`Location: ${location}`);
+  return lines.join('\n');
 }
 
 export default function InvitationSuccessShell({
@@ -172,7 +196,7 @@ export default function InvitationSuccessShell({
 
   // ------- WhatsApp share
   const handleWhatsApp = useCallback(() => {
-    const text = buildShareText({ brideName, groomName, weddingDate, venue, shareUrl });
+    const text = buildShareText({ brideName, groomName, weddingDate, venue, venueAddress: invitation?.venue_address || invitation?.venueAddress, shareUrl });
     const href = `https://wa.me/?text=${encodeURIComponent(text)}`;
     if (typeof window !== 'undefined') window.open(href, '_blank', 'noopener');
   }, [brideName, groomName, weddingDate, venue, shareUrl]);
@@ -373,7 +397,7 @@ export default function InvitationSuccessShell({
                           if (typeof navigator !== 'undefined' && navigator.share) {
                             navigator.share({
                               title: `${brideName || ''} & ${groomName || ''} — Wedding Invitation`.trim(),
-                              text: buildShareText({ brideName, groomName, weddingDate, venue, shareUrl }),
+                              text: buildShareText({ brideName, groomName, weddingDate, venue, venueAddress: invitation?.venue_address || invitation?.venueAddress, shareUrl }),
                               url: shareUrl,
                             }).catch(() => {});
                           } else {

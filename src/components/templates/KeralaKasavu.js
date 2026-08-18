@@ -32,51 +32,69 @@ const Editable = ({
   multiline = false 
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef(null);
+  const elementRef = useRef(null);
 
-  useEffect(() => setDraft(value), [value]);
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      if (inputRef.current.select) inputRef.current.select();
+    if (!isEditing && elementRef.current) {
+      const current = elementRef.current.textContent || "";
+      const next = value ?? "";
+      if (current !== next) elementRef.current.textContent = next;
+    }
+  }, [value, isEditing]);
+
+  useEffect(() => {
+    if (isEditing && elementRef.current) {
+      elementRef.current.focus();
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(elementRef.current);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) {}
     }
   }, [isEditing]);
 
   const commit = () => {
     setIsEditing(false);
-    if (onEdit) onEdit(field, draft || "");
+    if (elementRef.current && onEdit) {
+      const text = elementRef.current.innerText || elementRef.current.textContent || "";
+      onEdit(field, text.replace(/\u00a0/g, " "));
+    }
+  };
+
+  const cancel = () => {
+    if (elementRef.current) {
+      elementRef.current.textContent = value ?? "";
+    }
+    setIsEditing(false);
   };
 
   if (!editable) return <Tag className={className}>{value || placeholder}</Tag>;
 
-  if (isEditing) {
-    const common = {
-      ref: inputRef,
-      value: draft ?? "",
-      onChange: (e) => setDraft(e.target.value),
-      onBlur: commit,
-      onKeyDown: (e) => {
-        if (!multiline && e.key === "Enter") { e.preventDefault(); commit(); }
-        if (e.key === "Escape") { setDraft(value); commit(); }
-      },
-      className: `outline-none bg-amber-500/10 ring-2 ring-amber-600/60 rounded px-2 py-0.5 ${className}`,
-      placeholder
-    };
-    return multiline ? (
-      <textarea {...common} rows={Math.max(2, String(value ?? "").split("\n").length)} />
-    ) : (
-      <input as={undefined} {...common} />
-    );
-  }
-
   return (
-    <Tag 
-      onClick={() => setIsEditing(true)} 
-      className={`cursor-pointer outline-none ring-0 hover:ring-2 hover:ring-amber-500/50 rounded transition-all ${className}`} 
-      title="Click to edit"
+    <Tag
+      ref={elementRef}
+      contentEditable={isEditing}
+      suppressContentEditableWarning={true}
+      onClick={() => !isEditing && setIsEditing(true)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (isEditing) {
+          if (!multiline && e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancel(); }
+        }
+      }}
+      className={`
+        ${isEditing
+          ? "outline-none ring-2 ring-amber-600/60 rounded bg-amber-500/10"
+          : "cursor-pointer ring-0 hover:ring-2 hover:ring-amber-500/50 rounded transition-all"
+        }
+        ${className}
+      `}
+      title={!isEditing ? "Click to edit" : undefined}
     >
-      {value || <span className="opacity-40">{placeholder}</span>}
+      {value || (placeholder && !isEditing ? <span className="opacity-40">{placeholder}</span> : placeholder)}
     </Tag>
   );
 };

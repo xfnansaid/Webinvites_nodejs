@@ -301,10 +301,7 @@ export default function PaymentBanner({ formData, templateId }) {
                   </h3>
                   <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--champagne-500)]" />
                 </div>
-                <p className="text-[13px] sm:text-sm text-[var(--ink-muted)] leading-relaxed">
-                  Publish your invitation & get your premium shareable WhatsApp-ready link for just{' '}
-                  <span className="text-[var(--emerald-primary)] font-bold">₹399</span>.
-                </p>
+
               </div>
             </div>
 
@@ -320,7 +317,7 @@ export default function PaymentBanner({ formData, templateId }) {
                 </>
               ) : (
                 <>
-                  Pay & Publish Now
+                  Publish Now
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </>
               )}
