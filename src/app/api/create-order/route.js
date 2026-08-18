@@ -31,6 +31,37 @@ function coerceToIsoDate(value) {
 
 export async function POST(request) {
   try {
+    // 0. Pre-flight check: ensure required environment variables are present on Hostinger
+    const missingVars = [];
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')) {
+      missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
+    }
+    if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('placeholder')) {
+      missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    }
+    if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('placeholder')) {
+      missingVars.push('RAZORPAY_KEY_ID');
+    }
+    if (!process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET.includes('placeholder')) {
+      missingVars.push('RAZORPAY_KEY_SECRET');
+    }
+
+    if (missingVars.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Missing environment variable(s) on Hostinger: ${missingVars.join(', ')}`,
+          code: 'MISSING_ENV_VARS',
+          hint: `Please set ${missingVars.join(', ')} in your Hostinger Environment Variables panel or in .env.production on the Hostinger server, then rebuild and restart your app.`,
+        },
+        { status: 500 },
+      );
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
     const body = await request.json();
     const { 
       templateId, 
@@ -62,11 +93,13 @@ export async function POST(request) {
     let slug = generateSlug(groomName, brideName);
     
     // Check if slug exists and append number if it does
-    const { data: existing } = await supabaseServer
+    const { data: existing, error: slugErr } = await supabaseServer
       .from('invitations')
       .select('slug')
       .ilike('slug', `${slug}%`);
     
+    if (slugErr) throw slugErr;
+
     if (existing && existing.length > 0) {
       slug = `${slug}-${existing.length + 1}`;
     }
@@ -120,8 +153,11 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Error creating order:', error);
-    // Surface a detailed error to the client instead of a generic message so
-    // the PaymentBanner UI can tell the user exactly what went wrong.
+
+    const isFetchFailed =
+      String(error?.message || '').toLowerCase().includes('fetch failed') ||
+      String(error?.name || '').includes('TypeError');
+
     const isPlaceholderServiceKey =
       !process.env.SUPABASE_SERVICE_ROLE_KEY ||
       /PASTE_/i.test(process.env.SUPABASE_SERVICE_ROLE_KEY || '') ||
@@ -135,17 +171,27 @@ export async function POST(request) {
       ? `-- Run this in Supabase Dashboard → SQL Editor → New Query\nALTER TABLE invitations ENABLE ROW LEVEL SECURITY;\nDROP POLICY IF EXISTS "Public can view published invitations" ON invitations;\nCREATE POLICY "Public can view published invitations" ON invitations FOR SELECT USING (true);\nDROP POLICY IF EXISTS "Anyone can create a draft invitation" ON invitations;\nCREATE POLICY "Anyone can create a draft invitation" ON invitations FOR INSERT WITH CHECK (is_paid = false);\n\n-- Also add the missing new columns (WYSIWYG + payment tracking):\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS hero_tagline TEXT;\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS hero_event_text TEXT;\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS countdown_title TEXT;\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS razorpay_webhook_event_id TEXT;\nALTER TABLE invitations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;`
       : null;
 
+    let hint = 'Please check the server terminal for the full stack trace.';
+    let errorMessage = error?.message || 'Failed to create order';
+    let errorCode = error?.code || null;
+
+    if (isFetchFailed) {
+      errorCode = 'FETCH_FAILED';
+      errorMessage = 'Server connection to database or payment gateway failed (fetch failed).';
+      hint = 'This usually happens when environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are missing or invalid on Hostinger. Ensure they are configured in Hostinger environment variables and rebuild your project.';
+    } else if (copyableSql) {
+      hint = 'SUPABASE RLS FIX REQUIRED: 1) Open Supabase Dashboard → SQL Editor. 2) Paste the SQL shown below and click RUN.';
+    } else if (isPlaceholderServiceKey) {
+      hint = 'Tip: paste your SUPABASE_SERVICE_ROLE_KEY from Supabase Dashboard → Project Settings → API → service_role into environment variables.';
+    }
+
     return NextResponse.json(
       {
-        error: error?.message || 'Failed to create order',
-        code: error?.code || null,
+        error: errorMessage,
+        code: errorCode,
         details: error?.details || error?.hint || null,
         copyableSql,
-        hint: copyableSql
-          ? 'SUPABASE RLS FIX REQUIRED (30 seconds): 1) Open https://supabase.com/dashboard → your project → SQL Editor → New Query. 2) Paste the SQL shown above this hint and click RUN (green arrow). 3) Retry the Pay button. Optional: paste SUPABASE_SERVICE_ROLE_KEY into .env.local for 100% bypass.'
-          : isPlaceholderServiceKey
-          ? 'Tip: paste your SUPABASE_SERVICE_ROLE_KEY from Supabase Dashboard → Project Settings → API → service_role into .env.local and restart the dev server. Then click Pay again.'
-          : 'Please check the server terminal for the full stack trace.',
+        hint,
       },
       { status: 500 },
     );
