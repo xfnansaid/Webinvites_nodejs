@@ -57,8 +57,8 @@ export default function CreatePage() {
   }, [formData]);
 
   const summaryFields = [
-    { label: "Bride's Full Name", value: formData.brideName, field: "brideName", placeholder: "e.g. Ayesha Fathima" },
-    { label: "Groom's Full Name", value: formData.groomName, field: "groomName", placeholder: "e.g. Rizwan Ahmed" },
+    { label: "Bride/groom's Full Name", value: formData.brideName, field: "brideName", placeholder: "e.g. Ayesha Fathima" },
+    { label: "Groom/bride's Full Name", value: formData.groomName, field: "groomName", placeholder: "e.g. Rizwan Ahmed" },
     { label: "Tagline (above names)", value: formData.heroTagline, field: "heroTagline", placeholder: "Together with their families…" },
     { label: "Event Text", value: formData.heroEventText, field: "heroEventText", placeholder: "are entering into Nikah, insha'Allah" },
     { label: "Wedding Date", value: formData.weddingDate, field: "weddingDate", type: "date", placeholder: "YYYY-MM-DD" },
@@ -67,8 +67,8 @@ export default function CreatePage() {
     { label: "Full Address", value: formData.venueAddress, field: "venueAddress", multiline: true, placeholder: "Street, City, State, Pincode" },
     { label: "Google Maps URL", value: formData.mapsUrl, field: "mapsUrl", type: "url", placeholder: "https://www.google.com/maps/search/?api=1&query=..." },
     { label: "WhatsApp Number", value: formData.whatsappNumber, field: "whatsappNumber", type: "tel", placeholder: "91XXXXXXXXXX" },
-    { label: "Bride's Parents", value: formData.brideParents, field: "brideParents", placeholder: "Smt. Mariam & Sri. Fathima Ali" },
-    { label: "Groom's Parents", value: formData.groomParents, field: "groomParents", placeholder: "Smt. Zohra & Sri. Ahmed Khan" },
+    { label: "Bride/groom's Parents", value: formData.brideParents, field: "brideParents", placeholder: "Smt. Mariam & Sri. Fathima Ali" },
+    { label: "Groom/bride's Parents", value: formData.groomParents, field: "groomParents", placeholder: "Smt. Zohra & Sri. Ahmed Khan" },
     { label: "Countdown Heading", value: formData.countdownTitle, field: "countdownTitle", placeholder: "Counting Down to Forever" },
   ];
 
