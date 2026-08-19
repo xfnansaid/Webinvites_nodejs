@@ -15,8 +15,13 @@ import {
   Download,
   QrCode,
   PartyPopper,
+  Edit3,
+  LogIn,
+  LayoutDashboard,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth, userInitials, userDisplayName } from '@/lib/auth';
 
 const MAX_POLL_ATTEMPTS = 15; // about 30s at 2s each
 const POLL_INTERVAL_MS = 2000;
@@ -76,6 +81,27 @@ export default function InvitationSuccessShell({
   querySuccess = false,
   children,
 }) {
+  const router = useRouter();
+  const auth = useAuth();
+  const authUser = auth?.user || null;
+  const authLoading = auth?.loading || false;
+  const userPhone = auth?.userPhone || '';
+  const userName = auth?.userName || '';
+  const userEmail = auth?.userEmail || '';
+  const userAvatar = auth?.userAvatar || '';
+  const signOut = auth?.signOut || (async () => {});
+
+  const invitationId = invitation?.id || invitation?.invitationId || null;
+  const ownerPhone = invitation?.owner_phone || invitation?.ownerPhone || null;
+  const ownerId = invitation?.owner_id || invitation?.ownerId || null;
+
+  // Google users never set owner_phone on create-order (we only set owner_id).
+  // Legacy phone-OTP invitations may have owner_phone set.
+  const isOwner = Boolean(
+    (authUser && ownerId && String(authUser.id) === String(ownerId))
+    || (authUser && ownerPhone && userPhone && String(userPhone) === String(ownerPhone))
+  );
+
   const razorpayOrderId = invitation?.razorpay_order_id;
   const groomName = invitation?.groom_name || invitation?.groomName;
   const brideName = invitation?.bride_name || invitation?.brideName;
@@ -234,6 +260,65 @@ export default function InvitationSuccessShell({
 
   return (
     <main className="min-h-screen relative">
+      {/* ============================================================
+          OWNER TOOLBAR — visible only to the authenticated invitation owner.
+          Floats fixed-top, left-aligned, doesn't block share/navbar on small screens.
+          ============================================================ */}
+      {(isOwner || (authUser && (ownerId || ownerPhone) && !authLoading)) && (
+        <div className="fixed top-3 sm:top-4 left-3 sm:left-4 z-[160] max-w-[calc(100%-1.5rem)] sm:max-w-md pointer-events-auto">
+          <div className="rounded-2xl sm:rounded-3xl bg-white/90 backdrop-blur-xl border border-[var(--emerald-primary)]/10 shadow-[0_14px_40px_rgba(15,56,44,0.12)] overflow-hidden">
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap items-center gap-2 sm:gap-2.5">
+              {isOwner ? (
+                <>
+                  <span className="inline-flex items-center gap-2 px-1.5 pr-3 py-1 rounded-full bg-[var(--emerald-light)] text-[var(--emerald-primary)] text-[10px] sm:text-[11px] font-bold uppercase tracking-widest border border-[var(--emerald-primary)]/10">
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--emerald-primary)] text-white text-[9px] font-bold">
+                        {userInitials(authUser)}
+                      </span>
+                    )}
+                    <span className="max-w-[120px] sm:max-w-[160px] truncate">
+                      {userName || (userEmail ? userEmail.split('@')[0] : 'Owner')}
+                    </span>
+                  </span>
+                  {invitationId && (
+                    <Link
+                      href={`/edit/${encodeURIComponent(invitationId)}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-[var(--emerald-primary)] text-white text-[11px] sm:text-xs font-bold shadow-md shadow-[var(--emerald-primary)]/15 hover:bg-[var(--emerald-dark)] transition-colors active:scale-[0.98]"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Edit Invite
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-[var(--emerald-light)]/60 text-[var(--ink-soft)] hover:text-[var(--ink)] text-[11px] font-bold transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => signOut().then(() => router.refresh && router.refresh())}
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-red-50 hover:ring-red-200 text-[var(--ink-soft)] hover:text-red-600 text-[11px] font-bold transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href={`/signin?next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname + window.location.search : '')}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-[var(--emerald-light)]/60 text-[var(--ink-soft)] hover:text-[var(--ink)] text-[11px] font-bold transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign in with Google to edit
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================
           GLOBAL CLIENT-SIDE CSS: hide the PREVIEW/DRAFT overlays immediately
           when client knows Razorpay says PAID, before the server re-render.
@@ -410,7 +495,7 @@ export default function InvitationSuccessShell({
                         More sharing options
                       </button>
                       <Link
-                        href="/templates"
+                        href="/"
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--emerald-light)]/60 hover:bg-[var(--emerald-light)] text-[var(--emerald-primary)] hover:text-[var(--emerald-dark)] font-semibold text-[11px] sm:text-xs transition-colors"
                       >
                         <Download className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />

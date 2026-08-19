@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ShieldCheck, ArrowRight, Loader2, Sparkles, X, Copy, Check } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, ShieldCheck, ArrowRight, Loader2, Sparkles, X, Copy, Check, LogIn } from 'lucide-react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
+import { useAuth, userInitials } from '@/lib/auth';
+
+// Storage key for the anonymous edits to stage through sign-in gate
+const STAGE_KEY = 'wi_publish_stage_v1';
 
 // Poll with exponential backoff for window.Razorpay being ready after the
 // checkout.js script injects. Ad blockers / corporate proxies sometimes
@@ -34,12 +38,88 @@ function waitForRazorpay(timeoutMs = 12000) {
   });
 }
 
-export default function PaymentBanner({ formData, templateId }) {
+// Stage current formData to localStorage AND kick off the Google OAuth flow.
+// After the Google redirect round-trip lands on /signin → signed-in → router.replace
+// (back to `returnTo`). This component auto-detects staged data on mount and resumes
+// the publish flow via handlePay within ~350ms (see the useEffect above handlePay).
+function stageEditsAndRedirect({ formData, templateId, existingInvitationId, router, signInWithGoogle }) {
+  if (typeof window === 'undefined') return;
+  const returnTo = window.location.pathname + window.location.search;
+  const payload = {
+    at: Date.now(),
+    formData: { ...formData },
+    templateId,
+    existingInvitationId: existingInvitationId || null,
+    returnTo,
+  };
+  try {
+    localStorage.setItem(STAGE_KEY, JSON.stringify(payload));
+  } catch {}
+  // Use the Google OAuth redirect (signInWithGoogle stores nextRelative in a second
+  // key — the signin page consumes it and routes back to returnTo after sign-in).
+  if (signInWithGoogle) {
+    signInWithGoogle({ nextRelative: returnTo }).catch((e) => {
+      // Fallback if Google fails to start: plain redirect to sign-in page
+      const next = encodeURIComponent(returnTo);
+      router.push(`/signin?next=${next}&stage=1`);
+    });
+  } else {
+    const next = encodeURIComponent(returnTo);
+    router.push(`/signin?next=${next}&stage=1`);
+  }
+}
+
+function tryConsumeStagedEdits() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Expire staged edits > 10 min old
+    if (!parsed?.at || Date.now() - parsed.at > 10 * 60 * 1000) {
+      localStorage.removeItem(STAGE_KEY);
+      return null;
+    }
+    localStorage.removeItem(STAGE_KEY);
+    return parsed;
+  } catch {
+    try { localStorage.removeItem(STAGE_KEY); } catch {}
+    return null;
+  }
+}
+
+export default function PaymentBanner({
+  formData,
+  templateId,
+  existingInvitationId = null,
+  invitationAlreadyPaid = false,
+  onAfterSignInAutoPublish,
+}) {
+  const router = useRouter();
+  const { user, loading: authLoading, userPhone, userName, userEmail, userAvatar, signInWithGoogle } = useAuth();
+
   const [loading, setLoading] = useState(false);
   const [lastError, setLastError] = useState(null); // {message, code, hint, copyableSql}
   const [sqlCopied, setSqlCopied] = useState(false);
   const sqlTextareaRef = useRef(null);
-  const router = useRouter();
+
+  // On mount (after sign-in redirect): auto-consume staged edits and republish
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    const staged = tryConsumeStagedEdits();
+    if (staged && (staged.templateId === templateId || !existingInvitationId)) {
+      // Use the staged edits (most up-to-date from before the sign-in gate).
+      // Trigger a synthetic click of Publish Now by calling the pay handler.
+      // We need a small delay so the handler closure sees `user` hydrated.
+      const t = setTimeout(() => {
+        if (onAfterSignInAutoPublish) onAfterSignInAutoPublish();
+        handlePay(staged.formData || null, staged.existingInvitationId || null);
+      }, 350);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, templateId, existingInvitationId]);
 
   // Wipe the error banner when the user makes any edit so it doesn't hang around
   useEffect(() => {
@@ -67,8 +147,49 @@ export default function PaymentBanner({ formData, templateId }) {
     }
   }, []);
 
-  const handlePay = async () => {
+  /**
+   * The unified Publish Now flow.
+   *
+   * 1) If anonymous → stage formData to localStorage → redirect to /signin.
+   * 2) If signed in → fetch create-order (passes owner via cookies) → open Razorpay modal.
+   * 3) Success → redirect to /i/[slug]?success=true → Congratulations banner.
+   */
+  const handlePay = useCallback(async (overrideFormData = null, overrideExistingId = null) => {
     setLastError(null);
+
+    // SIGN-IN GATE: If user is not authenticated, stage everything and
+    // redirect to Google sign-in flow. 10-second cached auth check only (no spinner).
+    if (!authLoading && !user) {
+      stageEditsAndRedirect({
+        formData: overrideFormData || formData,
+        templateId,
+        existingInvitationId: overrideExistingId || existingInvitationId,
+        router,
+        signInWithGoogle,
+      });
+      return;
+    }
+    // Auth still loading? wait briefly then fallback to stage.
+    if (authLoading && !user) {
+      // Wait up to 500ms for auth to hydrate; else proceed through stage.
+      const started = Date.now();
+      await new Promise((res) => {
+        const t = setInterval(() => {
+          if (user || Date.now() - started > 500) { clearInterval(t); res(); }
+        }, 50);
+      });
+      if (!user) {
+        stageEditsAndRedirect({
+          formData: overrideFormData || formData,
+          templateId,
+          existingInvitationId: overrideExistingId || existingInvitationId,
+          router,
+          signInWithGoogle,
+        });
+        return;
+      }
+    }
+
     try {
       setLoading(true);
 
@@ -84,16 +205,22 @@ export default function PaymentBanner({ formData, templateId }) {
         return;
       }
 
+      const payload = {
+        ...(overrideFormData || formData),
+        templateId,
+        ...((overrideExistingId || existingInvitationId)
+          ? { invitationId: overrideExistingId || existingInvitationId }
+          : {}),
+      };
+
       // 2. Ask our server to create a Razorpay order & draft invitation in Supabase
       let response;
       try {
         response = await fetch('/api/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            templateId,
-          }),
+          body: JSON.stringify(payload),
+          credentials: 'same-origin', // ensures auth cookies are sent so server can set owner_id
         });
       } catch (netErr) {
         setLastError({
@@ -117,12 +244,13 @@ export default function PaymentBanner({ formData, templateId }) {
       }
 
       // 3. Open Razorpay checkout modal
+      const fd = overrideFormData || formData;
       const options = {
         key: data.keyId,
         amount: data.amount,
         currency: 'INR',
         name: 'WEB INVITES',
-        description: `Wedding Invitation - ${formData.groomName} & ${formData.brideName}`,
+        description: `Wedding Invitation - ${fd.groomName} & ${fd.brideName}`,
         order_id: data.orderId,
         handler: async function (rzpResponse) {
           // Instant server-side signature verification (recommended in
@@ -150,8 +278,8 @@ export default function PaymentBanner({ formData, templateId }) {
           },
         },
         prefill: {
-          name: `${formData.groomName} & ${formData.brideName}`,
-          contact: formData.whatsappNumber,
+          name: `${fd.groomName} & ${fd.brideName}`,
+          contact: fd.whatsappNumber || userPhone,
         },
         theme: {
           color: '#0F382C', // Emerald Primary
@@ -192,7 +320,21 @@ export default function PaymentBanner({ formData, templateId }) {
       // No-op for happy/sad paths that set loading explicitly; this protects
       // against any unhandled throw leaving the button stuck.
     }
-  };
+  }, [authLoading, user, router, templateId, formData, existingInvitationId, userPhone]);
+
+  const buttonLabel = useMemo(() => {
+    if (authLoading) return 'Checking account…';
+    if (invitationAlreadyPaid) {
+      return user ? 'Save edits & update live site' : 'Sign in with Google to update →';
+    }
+    return user ? 'Publish Now' : 'Sign in with Google & Publish →';
+  }, [authLoading, invitationAlreadyPaid, user]);
+
+  const buttonIcon = useMemo(() => {
+    if (authLoading) return <Loader2 className="w-5 h-5 animate-spin" />;
+    if (!user) return <LogIn className="w-5 h-5" />;
+    return <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />;
+  }, [authLoading, user]);
 
   return (
     <>
@@ -291,34 +433,55 @@ export default function PaymentBanner({ formData, templateId }) {
         <div className="bg-white/92 backdrop-blur-xl border-t border-[var(--border-subtle)] shadow-[0_-10px_40px_rgba(15,56,44,0.1)] p-4 sm:p-5 md:p-6 pointer-events-auto pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-5 md:gap-6">
             <div className="flex items-center gap-3 sm:gap-4 text-center md:text-left w-full md:w-auto">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--emerald-light)] rounded-2xl sm:rounded-2xl flex items-center justify-center text-[var(--emerald-primary)] shadow-inner shrink-0">
-                <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 mb-1 flex-wrap">
-                  <h3 className="text-lg sm:text-xl font-display font-bold text-[var(--emerald-primary)] leading-none">
-                    Ready to Publish?
-                  </h3>
-                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--champagne-500)]" />
+              {user && (
+                <div className="hidden md:flex items-center gap-2 px-1.5 pr-3 py-1.5 rounded-2xl bg-[var(--emerald-light)]/60 ring-1 ring-[var(--emerald-primary)]/10 border border-[var(--emerald-primary)]/10">
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+                  ) : (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--emerald-primary)] text-white text-[10px] font-bold">
+                      {userInitials(user)}
+                    </span>
+                  )}
+                  <div className="leading-tight">
+                    <div className="text-[10px] uppercase tracking-widest font-bold text-[var(--emerald-primary)]/80">Signed in with Google</div>
+                    <div className="text-[12px] font-bold text-[var(--ink)] truncate max-w-[160px]">
+                      {userName || userEmail || 'You'}
+                    </div>
+                  </div>
                 </div>
+              )}
 
+              <div className="min-w-0">
+                <div className="flex items-center justify-center md:justify-start gap-1.5 mb-1">
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--champagne-500)]" />
+                  <span className="text-[11px] uppercase tracking-[0.2em] font-bold text-[var(--ink-muted)]">
+                    {invitationAlreadyPaid ? 'Update your live invitation' : 'Go live in under 30 seconds'}
+                  </span>
+                </div>
+                <p className="text-[var(--ink-soft)] text-xs sm:text-sm font-medium leading-relaxed">
+                  {user
+                    ? invitationAlreadyPaid
+                      ? `Editing your invitation (${userName || userEmail || 'your account'}). Razorpay ₹299 re-publication charge below.`
+                      : `Publishing under ${userName || userEmail || 'your Google account'} — invite appears on your dashboard for future edits.`
+                    : 'One-tap secure Google sign-in. Your invitation is saved to your account so you can edit & republish anytime.'}
+                </p>
               </div>
             </div>
 
             <button
-              onClick={handlePay}
+              onClick={() => handlePay()}
               disabled={loading}
               className="w-full md:w-auto px-8 sm:px-10 py-3.5 sm:py-4 bg-[var(--emerald-primary)] text-white rounded-2xl font-bold flex items-center justify-center gap-2.5 sm:gap-3 hover:bg-[var(--emerald-dark)] transition-all shadow-xl shadow-[var(--emerald-primary)]/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed group"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Securing Payment...
+                  {invitationAlreadyPaid ? 'Saving to your live site…' : 'Securing Payment…'}
                 </>
               ) : (
                 <>
-                  Publish Now
-                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                  {buttonLabel}
+                  {buttonIcon}
                 </>
               )}
             </button>
@@ -328,3 +491,4 @@ export default function PaymentBanner({ formData, templateId }) {
     </>
   );
 }
+

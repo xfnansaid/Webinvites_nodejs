@@ -35,7 +35,7 @@ export async function generateMetadata({ params, searchParams }) {
   if (!invitation) {
     return {
       title: 'WEB INVITES — Digital Wedding Invitations',
-      description: 'Create beautiful digital wedding invitations at ₹399 flat.',
+      description: 'Create beautiful digital wedding invitations at ₹299 flat.',
     };
   }
   const bride = invitation.bride_name || '';

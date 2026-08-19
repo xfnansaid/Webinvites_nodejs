@@ -1,0 +1,587 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import React, { useEffect, useMemo, useState, useCallback, Suspense } from 'react';
+import { templates } from '@/components/templates';
+import PaymentBanner from '@/components/PaymentBanner';
+import SiteNavbar from '@/components/SiteNavbar';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Edit3,
+  Eye,
+  Loader2,
+  LogOut,
+  Save,
+  Sparkles,
+  User as UserIcon,
+  XCircle,
+  ExternalLink,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+} from 'lucide-react';
+import { useAuth, prettyPhone } from '@/lib/auth';
+
+const DEFAULT_TEMPLATE_ID = 'standard-crimson';
+
+// ---------- Helpers ----------
+const mapDBtoForm = (dbRow) => ({
+  templateId: dbRow?.template_id,
+  groomName: dbRow?.groom_name,
+  brideName: dbRow?.bride_name,
+  weddingDate: dbRow?.wedding_date,
+  weddingTime: dbRow?.wedding_time,
+  venue: dbRow?.venue,
+  venueAddress: dbRow?.venue_address || dbRow?.venue,
+  mapsUrl: dbRow?.maps_url,
+  mapUrl: dbRow?.maps_url,
+  directionsUrl: dbRow?.maps_url,
+  whatsappNumber: dbRow?.whatsapp_number,
+  groomParents: dbRow?.groom_parents,
+  brideParents: dbRow?.bride_parents,
+  heroTagline: dbRow?.hero_tagline,
+  heroEventText: dbRow?.hero_event_text,
+  countdownTitle: dbRow?.countdown_title,
+});
+
+// ---------- Inner content component (uses useSearchParams wrapped in Suspense) ----------
+function EditorInner({ params }) {
+  const { id: invitationId } = params;
+  const router = useRouter();
+  const { user, loading: authLoading, userPhone, signOut } = useAuth();
+
+  const [invitation, setInvitation] = useState(null);
+  const [loadingInvite, setLoadingInvite] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const resolvedTemplateId = invitation?.template_id || DEFAULT_TEMPLATE_ID;
+  const TemplateComponent = templates[resolvedTemplateId] || templates[DEFAULT_TEMPLATE_ID];
+  const templateLabel = String(resolvedTemplateId).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  // Editor state: mirror of create/[templateId]/page.js structure
+  const defaults = useMemo(() => ({
+    groomName: invitation?.groom_name || "Rizwan",
+    brideName: invitation?.bride_name || "Ayesha",
+    weddingDate: invitation?.wedding_date || "2026-12-25",
+    weddingTime: invitation?.wedding_time || "10:00 AM",
+    venue: invitation?.venue || "Grand Palace Auditorium",
+    venueAddress: invitation?.venue_address || "Beach Road, Calicut, Kerala 673001, India",
+    mapsUrl: invitation?.maps_url || "https://www.google.com/maps/search/?api=1&query=Calicut+Kerala",
+    mapUrl: invitation?.maps_url || "https://www.google.com/maps/search/?api=1&query=Calicut+Kerala",
+    directionsUrl: invitation?.maps_url || "https://www.google.com/maps/search/?api=1&query=Calicut+Kerala",
+    whatsappNumber: invitation?.whatsapp_number || "919876543210",
+    groomParents: invitation?.groom_parents || "",
+    brideParents: invitation?.bride_parents || "",
+    heroTagline: invitation?.hero_tagline || "With the blessings of our families, we invite you to share in our joy",
+    heroEventText: invitation?.hero_event_text || "as we embark on this beautiful journey together",
+    countdownTitle: invitation?.countdown_title || "Counting Every Moment",
+  }), [invitation]);
+
+  const [formData, setFormData] = useState(defaults);
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState({ tone: '', text: '' });
+
+  // Step 2: Details inputs section mirror (kept in sync with formData)
+  // Sync defaults → formData only the first time invitation loads
+  useEffect(() => {
+    setFormData({
+      groomName: invitation?.groom_name || defaults.groomName,
+      brideName: invitation?.bride_name || defaults.brideName,
+      weddingDate: invitation?.wedding_date || defaults.weddingDate,
+      weddingTime: invitation?.wedding_time || defaults.weddingTime,
+      venue: invitation?.venue || defaults.venue,
+      venueAddress: invitation?.venue_address || defaults.venueAddress,
+      mapsUrl: invitation?.maps_url || defaults.mapsUrl,
+      mapUrl: invitation?.maps_url || defaults.mapUrl,
+      directionsUrl: invitation?.maps_url || defaults.directionsUrl,
+      whatsappNumber: invitation?.whatsapp_number || defaults.whatsappNumber,
+      groomParents: invitation?.groom_parents || defaults.groomParents,
+      brideParents: invitation?.bride_parents || defaults.brideParents,
+      heroTagline: invitation?.hero_tagline || defaults.heroTagline,
+      heroEventText: invitation?.hero_event_text || defaults.heroEventText,
+      countdownTitle: invitation?.countdown_title || defaults.countdownTitle,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invitation?.id]);
+
+  const handleInlineEdit = useCallback((field, value) => {
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'mapsUrl' || field === 'mapUrl' || field === 'directionsUrl') {
+        next.mapsUrl = value;
+        next.mapUrl = value;
+        next.directionsUrl = value;
+      }
+      return next;
+    });
+  }, []);
+
+  // Fetch invitation once auth is resolved
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace(`/signin?next=${encodeURIComponent(`/edit/${encodeURIComponent(invitationId)}`)}`);
+      return;
+    }
+    setLoadingInvite(true);
+    setLoadError('');
+    fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, { cache: 'no-store' })
+      .then(async res => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            router.replace(`/signin?next=${encodeURIComponent(`/edit/${encodeURIComponent(invitationId)}`)}`);
+            return;
+          }
+          throw new Error(body.error || 'Could not load this invitation.');
+        }
+        if (!body.invitation) throw new Error('Invitation not found.');
+        setInvitation(body.invitation);
+      })
+      .catch(e => setLoadError(e?.message || 'Failed to load invitation'))
+      .finally(() => setLoadingInvite(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, invitationId]);
+
+  // Normalized template data (aliases)
+  const templateData = useMemo(() => {
+    const canonical = formData.mapsUrl || formData.mapUrl || formData.directionsUrl;
+    return { ...formData, mapsUrl: canonical, mapUrl: canonical, directionsUrl: canonical };
+  }, [formData]);
+
+  const editsCount = useMemo(() => {
+    const left = mapDBtoForm(invitation || {});
+    let n = 0;
+    Object.keys(left).forEach(k => {
+      if (k === 'templateId') return;
+      if (String(formData[k] ?? '') !== String(left[k] ?? '')) n++;
+    });
+    return n;
+  }, [formData, invitation]);
+
+  // Auto-generate publish banner formData with correct templateId from the invite
+  const bannerFormData = useMemo(() => ({
+    ...templateData,
+    templateId: resolvedTemplateId,
+  }), [templateData, resolvedTemplateId]);
+
+  // Payment banner should UPDATE existing row (by invitationId) instead of inserting new
+  const PaymentBannerWithExisting = invitationId ? (
+    <PaymentBanner
+      formData={bannerFormData}
+      templateId={resolvedTemplateId}
+      existingInvitationId={invitationId}
+      invitationAlreadyPaid={!!invitation?.is_paid}
+    />
+  ) : null;
+
+  // Save (PATCH) — no republish, just instant DB update
+  const handleSaveChanges = async () => {
+    setSaving(true);
+    setSaveMsg({ tone: '', text: '' });
+    try {
+      const canonical = formData.mapsUrl || formData.mapUrl || formData.directionsUrl;
+      const res = await fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: resolvedTemplateId,
+          groomName: formData.groomName,
+          brideName: formData.brideName,
+          weddingDate: formData.weddingDate,
+          weddingTime: formData.weddingTime,
+          venue: formData.venue,
+          venueAddress: formData.venueAddress,
+          mapsUrl: canonical,
+          whatsappNumber: formData.whatsappNumber,
+          groomParents: formData.groomParents,
+          brideParents: formData.brideParents,
+          heroTagline: formData.heroTagline,
+          heroEventText: formData.heroEventText,
+          countdownTitle: formData.countdownTitle,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Failed to save');
+      if (body.invitation) {
+        setInvitation(body.invitation);
+      }
+      setSaveMsg({ tone: 'emerald', text: 'Saved! Your live invitation link shows these changes instantly.' });
+    } catch (e) {
+      setSaveMsg({ tone: 'red', text: e?.message || 'Could not save. Please try again.' });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg({ tone: '', text: '' }), 5000);
+    }
+  };
+
+  const handleResetToDB = () => {
+    if (!invitation) return;
+    setFormData({
+      groomName: invitation.groom_name || defaults.groomName,
+      brideName: invitation.bride_name || defaults.brideName,
+      weddingDate: invitation.wedding_date || defaults.weddingDate,
+      weddingTime: invitation.wedding_time || defaults.weddingTime,
+      venue: invitation.venue || defaults.venue,
+      venueAddress: invitation.venue_address || defaults.venueAddress,
+      mapsUrl: invitation.maps_url || defaults.mapsUrl,
+      mapUrl: invitation.maps_url || defaults.mapUrl,
+      directionsUrl: invitation.maps_url || defaults.directionsUrl,
+      whatsappNumber: invitation.whatsapp_number || defaults.whatsappNumber,
+      groomParents: invitation.groom_parents || defaults.groomParents,
+      brideParents: invitation.bride_parents || defaults.brideParents,
+      heroTagline: invitation.hero_tagline || defaults.heroTagline,
+      heroEventText: invitation.hero_event_text || defaults.heroEventText,
+      countdownTitle: invitation.countdown_title || defaults.countdownTitle,
+    });
+  };
+
+  // ---------- Loading / error screens ----------
+  if (authLoading || loadingInvite) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--cream)] via-white to-[var(--emerald-light)]/40">
+        <div className="flex flex-col items-center gap-3 text-[var(--ink-muted)]">
+          <Loader2 className="w-7 h-7 animate-spin text-[var(--emerald-primary)]" />
+          <span className="text-sm font-semibold">Loading your invitation…</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-[var(--cream)] via-white to-[var(--emerald-light)]/40">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 pt-16 pb-24 text-center">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-red-50 ring-1 ring-red-200 text-red-600 flex items-center justify-center mb-4">
+            <XCircle className="w-7 h-7" />
+          </div>
+          <h1 className="font-display text-2xl sm:text-3xl text-[var(--ink)] mb-2 tracking-tight">
+            Could not load invitation
+          </h1>
+          <p className="text-sm sm:text-base text-[var(--ink-muted)] leading-relaxed mb-6">{loadError}</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            <Link href="/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-[var(--emerald-light)]/60 text-[var(--ink)] font-bold text-sm transition-colors">
+              ← Back to Dashboard
+            </Link>
+            <button
+              onClick={() => router.refresh()}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[var(--emerald-primary)] text-white font-bold text-sm shadow-md shadow-[var(--emerald-primary)]/20 hover:bg-[var(--emerald-dark)] transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const inviteLink =
+    typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.host}/i/${encodeURIComponent(invitation?.slug || '')}`
+      : '';
+
+  // ---------- Main Editor ----------
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-[var(--cream)] via-white to-[var(--emerald-light)]/40">
+      {/* Header */}
+      <div className="sticky top-0 z-[120] backdrop-blur bg-white/75 border-b border-black/5">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[var(--ink-soft)] hover:text-[var(--emerald-primary)] hover:bg-[var(--emerald-light)]/60 text-xs sm:text-sm font-semibold transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Back to Dashboard</span>
+            <span className="sm:hidden">Dashboard</span>
+          </Link>
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 shadow-sm">
+            <Sparkles className="w-4 h-4 text-[var(--champagne-500)]" />
+            <div className="leading-tight">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-[var(--ink-muted)]">Editing</div>
+              <div className="text-[12px] font-bold text-[var(--ink)] truncate max-w-[180px] sm:max-w-none">
+                {invitation?.bride_name || 'Bride'} &amp; {invitation?.groom_name || 'Groom'} · {templateLabel}
+              </div>
+            </div>
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* Edits indicator */}
+            {editsCount > 0 && (
+              <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-[11px] font-bold">
+                <Edit3 className="w-3.5 h-3.5" /> {editsCount} change{editsCount === 1 ? '' : 's'} unsaved
+              </div>
+            )}
+
+            {/* Save button */}
+            <button
+              onClick={handleSaveChanges}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[var(--emerald-primary)] text-white text-xs sm:text-sm font-bold shadow-md shadow-[var(--emerald-primary)]/15 hover:bg-[var(--emerald-dark)] active:scale-[0.98] transition-all disabled:opacity-70"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+
+            {/* View live */}
+            {invitation?.slug && (
+              <Link
+                href={`/i/${encodeURIComponent(invitation.slug)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-[var(--emerald-light)]/60 text-[var(--ink-soft)] hover:text-[var(--ink)] font-semibold text-xs transition-colors"
+              >
+                <Eye className="w-4 h-4" /> View Live
+              </Link>
+            )}
+
+            {/* Account menu */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5">
+              <UserIcon className="w-4 h-4 text-[var(--ink-soft)]" />
+              <span className="text-xs font-semibold text-[var(--ink)]">{prettyPhone(userPhone || '')}</span>
+            </div>
+            <button
+              onClick={() => signOut().then(() => router.replace('/'))}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-red-50 hover:ring-red-200 text-[var(--ink-soft)] hover:text-red-600 text-xs font-semibold transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Save status banner */}
+        {saveMsg.text && (
+          <div className={`max-w-7xl mx-auto px-3 sm:px-6 pb-3`}>
+            <div className={`rounded-2xl px-4 py-2.5 flex items-start gap-2 text-xs sm:text-sm font-semibold ${
+              saveMsg.tone === 'emerald'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}>
+              {saveMsg.tone === 'emerald' ? (
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              )}
+              <span className="leading-relaxed">{saveMsg.text}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Live link banner */}
+      {invitation?.is_paid && invitation?.slug && (
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 mt-4 sm:mt-5">
+          <div className="rounded-2xl bg-white/80 border border-[var(--emerald-primary)]/10 ring-1 ring-black/5 px-4 py-3 sm:px-5 sm:py-4 flex flex-wrap items-center gap-3 justify-between shadow-[0_10px_30px_rgba(15,56,44,0.06)]">
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              <div className="shrink-0 w-10 h-10 rounded-2xl bg-[var(--emerald-light)] text-[var(--emerald-primary)] flex items-center justify-center">
+                <ExternalLink className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-0.5">
+                  Live Invitation Link
+                </div>
+                <div className="truncate text-xs sm:text-sm font-semibold text-[var(--ink)]">
+                  {inviteLink}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => handleSaveChanges()}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--emerald-light)]/80 hover:bg-[var(--emerald-light)] text-[var(--emerald-primary)] hover:text-[var(--emerald-dark)] font-bold text-xs transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Sync last edits
+              </button>
+              <button
+                onClick={handleResetToDB}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white ring-1 ring-black/5 hover:bg-[var(--cream)] text-[var(--ink-soft)] font-semibold text-xs transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Reset to saved
+              </button>
+              <a
+                href={`/i/${encodeURIComponent(invitation.slug)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[var(--emerald-primary)] text-white text-xs sm:text-sm font-bold shadow-md shadow-[var(--emerald-primary)]/15 hover:bg-[var(--emerald-dark)] transition-colors active:scale-[0.98]"
+              >
+                <Eye className="w-4 h-4" /> Open Live Invite
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDITOR LAYOUT — mirror of create/[templateId]/page.js */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
+          {/* LEFT: Live phone preview (responsive mobile-sized) */}
+          <section className="order-2 lg:order-1 w-full">
+            {/* Smaller phone on mobile so both preview + details fit side by side on desktop */}
+            <div className="w-full flex justify-center lg:justify-end">
+              <div
+                className={`relative w-full max-w-[260px] sm:max-w-[300px] lg:max-w-[340px] shrink-0 rounded-[54px] sm:rounded-[58px] border-[10px] sm:border-[12px] border-[#0f172a] shadow-2xl shadow-slate-900/40 overflow-hidden transition-all`}
+                style={{ aspectRatio: '393 / 852' }}
+              >
+                {/* Status Bar (mobile scaled down) */}
+                <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 sm:px-7 py-[10px] sm:py-3 z-[80] text-white text-[9px] sm:text-[11px] font-semibold font-sans tracking-widest">
+                  <span className="text-[10px] sm:text-xs">9:41</span>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="w-3.5 h-2.5 sm:w-[18px] sm:h-3 border border-white rounded-[3px] relative">
+                      <div className="absolute inset-[1.5px] bg-white rounded-[1.5px]"></div>
+                      <div className="absolute right-[-2px] top-1/2 -translate-y-1/2 w-[1.5px] sm:w-[2px] h-[5px] sm:h-[7px] bg-white rounded-r-sm opacity-70"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dynamic Island */}
+                <div className="absolute top-[6px] sm:top-2 left-1/2 -translate-x-1/2 w-[90px] sm:w-[100px] h-[23px] sm:h-7 bg-black rounded-full z-[90]"></div>
+
+                {/* Scrollable Template Content */}
+                <div className="absolute inset-0 overflow-y-auto hide-scrollbar pt-[28px] sm:pt-[34px] pb-4 sm:pb-6 [-webkit-overflow-scrolling:touch]">
+                  <div className="WebInvitesPreviewContainer" style={{ containerType: 'inline-size', width: '100%', maxWidth: '100%' }}>
+                    <TemplateComponent
+                      key={resolvedTemplateId}
+                      data={templateData}
+                      isDraft={false}
+                      editable={true}
+                      onEdit={handleInlineEdit}
+                    />
+                  </div>
+                </div>
+
+                {/* Home Indicator */}
+                <div className="absolute bottom-[10px] sm:bottom-[5px] left-1/2 -translate-x-1/2 w-[100px] sm:w-[72px] h-[7px] sm:h-[2.5px] rounded-full bg-white/40 z-[70]"></div>
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT: Details form */}
+          <section className="order-1 lg:order-2 w-full space-y-4 sm:space-y-5">
+            <div className="rounded-2xl bg-white border border-black/5 shadow-[0_22px_60px_rgba(15,56,44,0.12)] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-black/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-[var(--emerald-light)] text-[var(--emerald-primary)] flex items-center justify-center">
+                    <Edit3 className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[11px] sm:text-xs uppercase tracking-widest font-bold text-[var(--ink-muted)]">Step 2 · Edit Details</div>
+                    <div className="text-sm sm:text-base font-bold text-[var(--ink)] leading-tight">Couple, Date, Venue &amp; more</div>
+                  </div>
+                </div>
+                {detailsOpen ? <ChevronUp className="w-5 h-5 text-[var(--ink-soft)]" /> : <ChevronDown className="w-5 h-5 text-[var(--ink-soft)]" />}
+              </button>
+
+              {detailsOpen && (
+                <div className="px-4 sm:px-5 pb-5 sm:pb-6 space-y-3 sm:space-y-4 border-t border-black/5 pt-4 sm:pt-5">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Groom Name</span>
+                      <input value={formData.groomName} onChange={e => handleInlineEdit('groomName', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Bride Name</span>
+                      <input value={formData.brideName} onChange={e => handleInlineEdit('brideName', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Wedding Date</span>
+                      <input type="date" value={formData.weddingDate || ''} onChange={e => handleInlineEdit('weddingDate', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Time</span>
+                      <input type="time" value={formData.weddingTime || ''} onChange={e => handleInlineEdit('weddingTime', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Venue Name</span>
+                    <input value={formData.venue || ''} onChange={e => handleInlineEdit('venue', e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Venue Address</span>
+                    <textarea value={formData.venueAddress || ''} rows={2} onChange={e => handleInlineEdit('venueAddress', e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)] resize-none" />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Google Maps URL</span>
+                    <input value={formData.mapsUrl || ''} onChange={e => handleInlineEdit('mapsUrl', e.target.value)}
+                      placeholder="https://maps.google.com/..."
+                      className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">WhatsApp Number (with country code)</span>
+                    <input value={formData.whatsappNumber || ''} onChange={e => handleInlineEdit('whatsappNumber', e.target.value)}
+                      placeholder="919876543210"
+                      className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Groom&apos;s Parents</span>
+                      <input value={formData.groomParents || ''} onChange={e => handleInlineEdit('groomParents', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Bride&apos;s Parents</span>
+                      <input value={formData.brideParents || ''} onChange={e => handleInlineEdit('brideParents', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                  </div>
+                  <div className="pt-1 sm:pt-2 space-y-3 sm:space-y-4 border-t border-black/5">
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Hero Tagline</span>
+                      <input value={formData.heroTagline || ''} onChange={e => handleInlineEdit('heroTagline', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Hero Event Text</span>
+                      <input value={formData.heroEventText || ''} onChange={e => handleInlineEdit('heroEventText', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                    <label className="block">
+                      <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Countdown Title</span>
+                      <input value={formData.countdownTitle || ''} onChange={e => handleInlineEdit('countdownTitle', e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Publish / Payment */}
+            <Suspense fallback={null}>
+              {PaymentBannerWithExisting}
+            </Suspense>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ---------- Page shell: loads template and wraps AuthProvider awareness ----------
+export default function EditInvitationPage(props) {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--cream)] via-white to-[var(--emerald-light)]/40">
+        <Loader2 className="w-7 h-7 animate-spin text-[var(--emerald-primary)]" />
+      </main>
+    }>
+      <SiteNavbar variant="editor" />
+      <EditorInner params={props.params} searchParams={props.searchParams} />
+    </Suspense>
+  );
+}

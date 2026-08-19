@@ -157,14 +157,22 @@ export default function WeddingInvitationTemplate({
 
     mapUrl:
       "https://maps.google.com/?q=Borcelle+Ballroom",
+    mapsUrl:
+      "https://maps.google.com/?q=Borcelle+Ballroom",
+    directionsUrl:
+      "https://maps.google.com/?q=Borcelle+Ballroom",
 
     musicUrl: "",
   };
 
-  const values = {
+  const baseValues = {
     ...defaults,
     ...(data || {}),
   };
+  // Resolve canonical map URL from any field name
+  const mapDefaults = baseValues.venue ? `https://maps.google.com/?q=${encodeURIComponent(baseValues.venue)}` : "";
+  const canonicalMapUrl = baseValues.mapsUrl || baseValues.mapUrl || baseValues.directionsUrl || mapDefaults;
+  const values = { ...baseValues, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   const [countdown, setCountdown] = React.useState({
     days: "00",

@@ -113,6 +113,8 @@ const DEFAULT_DATA = {
   venueAddress: "Beach Road, Kozhikode (Calicut), Kerala 673032 — ample parking on site, 10 minutes from Kozhikode Railway Station.",
   directionsBtnText: "Get Directions",
   directionsUrl: "https://www.google.com/maps/search/?api=1&query=Kadaloram+Convention+Centre+Beach+Road+Kozhikode+Kerala",
+  mapsUrl: "https://www.google.com/maps/search/?api=1&query=Kadaloram+Convention+Centre+Beach+Road+Kozhikode+Kerala",
+  mapUrl: "https://www.google.com/maps/search/?api=1&query=Kadaloram+Convention+Centre+Beach+Road+Kozhikode+Kerala",
   bgImage: "https://one-tawny-two.vercel.app/0001/img/crimson-scroll-bg.webp"
 };
 
@@ -125,7 +127,11 @@ export default function WeddingInvitationTemplate({
   editable = false,
   onEdit
 }) {
-  const mergedData = { ...DEFAULT_DATA, ...data };
+  const baseData = { ...DEFAULT_DATA, ...data };
+  // Resolve canonical map URL from any field name
+  const canonicalMapUrl = baseData.mapsUrl || baseData.mapUrl || baseData.directionsUrl
+    || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(baseData.venueName || baseData.venue + ' ' + baseData.venueAddress)}`;
+  const mergedData = { ...baseData, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   // Countdown timer logic
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0 });
@@ -334,79 +340,87 @@ export default function WeddingInvitationTemplate({
       </section>
 
       {/* =========================================================================
-          COUNTDOWN SECTION
-          ========================================================================= */}
-      <section className="relative py-24 px-6 text-center text-[#FBF6EB] overflow-hidden bg-[radial-gradient(ellipse_at_top,#F7EEDD_0%,#F7EEDD_65%,#F7EEDD_100%)]">
-        <motion.div
-          initial={{ opacity: 0, y: 36 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
-          className="max-w-[1100px] mx-auto"
-        >
-          <div className="font-cinzel text-[0.72rem] tracking-[0.28em] uppercase text-[#000000] font-medium">
-            <Editable
-              value={mergedData.countdownEyebrow}
-              field="countdownEyebrow"
-              editable={editable}
-              onEdit={onEdit}
-              placeholder="Save the Date"
-            />
-          </div>
+    COUNTDOWN SECTION
+    ========================================================================= */}
+<section className="relative py-24 px-6 text-center text-[#FBF6EB] overflow-hidden bg-[radial-gradient(ellipse_at_top,#F7EEDD_0%,#F7EEDD_65%,#F7EEDD_100%)]">
+  <motion.div
+    initial={{ opacity: 0, y: 36 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.2 }}
+    transition={{ duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
+    className="max-w-[1100px] mx-auto"
+  >
+    <div className="font-cinzel text-[0.72rem] tracking-[0.28em] uppercase text-[#000000] font-medium">
+      <Editable
+        value={mergedData.countdownEyebrow}
+        field="countdownEyebrow"
+        editable={editable}
+        onEdit={onEdit}
+        placeholder="Save the Date"
+      />
+    </div>
 
-          <h2 className="font-cinzel text-[clamp(2.1rem,5cqw,3.1rem)] text-[#C9A227] font-medium tracking-[0.06em] mt-2">
-            <Editable
-              value={mergedData.countdownTitle}
-              field="countdownTitle"
-              editable={editable}
-              onEdit={onEdit}
-              placeholder="Counting Down to Forever"
-            />
-          </h2>
+    <h2 className="font-cinzel text-[clamp(2.1rem,5cqw,3.1rem)] text-[#C9A227] font-medium tracking-[0.06em] mt-2">
+      <Editable
+        value={mergedData.countdownTitle}
+        field="countdownTitle"
+        editable={editable}
+        onEdit={onEdit}
+        placeholder="Counting Down to Forever"
+      />
+    </h2>
 
-          <div className="flex justify-center items-center gap-[clamp(14px,3cqw,34px)] mt-11 flex-wrap">
-            {/* Days */}
-            <div className="min-w-[84px] flex flex-col items-center">
-              <div className="font-italiana text-[clamp(2.6rem,6cqw,4rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
-                {String(timeLeft.days).padStart(2, '0')}
-              </div>
-              <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
-                Days
-              </div>
-            </div>
+    <div className="flex justify-center items-center gap-[clamp(10px,2cqw,24px)] mt-8 flex-wrap">
+      {/* Days */}
+      <div className="min-w-[70px] flex flex-col items-center">
+        <div className="font-italiana text-[clamp(2rem,4cqw,3rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
+          {String(timeLeft.days).padStart(2, '0')}
+        </div>
+        <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
+          Days
+        </div>
+      </div>
 
-            {/* Separator */}
-            <div className="font-italiana text-[2.2rem] text-[#000000] self-start mt-1.5 opacity-50 select-none">
-              :
-            </div>
+      {/* Separator */}
+      <div className="font-italiana text-[1.8rem] text-[#000000] self-start mt-1.5 opacity-50 select-none">
+        :
+      </div>
 
-            {/* Hours */}
-            <div className="min-w-[84px] flex flex-col items-center">
-              <div className="font-italiana text-[clamp(2.6rem,6cqw,4rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
-                {String(timeLeft.hours).padStart(2, '0')}
-              </div>
-              <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
-                Hours
-              </div>
-            </div>
+      {/* Hours */}
+      <div className="min-w-[70px] flex flex-col items-center">
+        <div className="font-italiana text-[clamp(2rem,4cqw,3rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
+          {String(timeLeft.hours).padStart(2, '0')}
+        </div>
+        <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
+          Hours
+        </div>
+      </div>
 
-            {/* Separator */}
-            <div className="font-italiana text-[2.2rem] text-[#000000] self-start mt-1.5 opacity-50 select-none">
-              :
-            </div>
+      {/* Separator */}
+      <div className="font-italiana text-[1.8rem] text-[#000000] self-start mt-1.5 opacity-50 select-none">
+        :
+      </div>
 
-            {/* Minutes */}
-            <div className="min-w-[84px] flex flex-col items-center">
-              <div className="font-italiana text-[clamp(2.6rem,6cqw,4rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
-                {String(timeLeft.minutes).padStart(2, '0')}
-              </div>
-              <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
-                Minutes
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </section>
+      {/* Minutes */}
+      <div className="min-w-[70px] flex flex-col items-center">
+        <div className="font-italiana text-[clamp(2rem,4cqw,3rem)] text-[#000000] leading-none [font-variant-numeric:tabular-nums] [text-shadow:0_0_24px_rgba(232,201,122,0.35)]">
+          {String(timeLeft.minutes).padStart(2, '0')}
+        </div>
+        <div className="text-[0.68rem] tracking-[0.2em] uppercase text-[#000000] mt-2 opacity-80 font-cinzel">
+          Minutes
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div className="font-italiana text-[1.8rem] text-[#000000] self-start mt-1.5 opacity-50 select-none">
+        :
+      </div>
+
+      {/* Seconds */}
+      
+    </div>
+  </motion.div>
+</section>
 
 
 

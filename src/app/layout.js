@@ -1,4 +1,6 @@
 import { Amiri, Cinzel, Cormorant_Garamond, Noto_Serif, Plus_Jakarta_Sans, Pinyon_Script, Italiana, Marcellus, Great_Vibes, Lora, Montserrat, Allura, Mrs_Saint_Delafield, Jost, Noto_Serif_Malayalam } from 'next/font/google';
+import AppProviders from './providers';
+import './globals.css';
 
 const malayalam = Noto_Serif_Malayalam({
   subsets: ['latin', 'malayalam'],
@@ -23,7 +25,6 @@ const allura = Allura({
   weight: ['400'],
   variable: '--font-allura',
 });
-import './globals.css';
 
 const amiri = Amiri({
   subsets: ['latin'],
@@ -92,12 +93,12 @@ const montserrat = Montserrat({
 });
 
 export const metadata = {
-  title: 'WEB INVITES — Digital Wedding & Event Invitations | ₹399 Flat | Share on WhatsApp',
-  description: 'Create beautiful digital wedding and event invitations in minutes. 10 premium templates, flat ₹399, Canva-style inline WYSIWYG editor, live countdown, Get Directions link & WhatsApp sharing.',
+  title: 'WEB INVITES — Digital Wedding & Event Invitations | ₹299 Flat | Share on WhatsApp',
+  description: 'Create beautiful digital wedding and event invitations in minutes. 10 premium templates, flat ₹299, Canva-style inline WYSIWYG editor, live countdown, Get Directions link & WhatsApp sharing.',
   keywords: 'digital wedding invitation, online wedding invitation, WhatsApp wedding card, digital e-invite India, wedding invitation maker, Nikah invitation online, engagement invitation digital, WYSIWYG invite editor, countdown wedding invite, Get Directions link',
   openGraph: {
-    title: 'WEB INVITES — ₹399 Flat • Digital Wedding & Event Invitations',
-    description: '10 premium templates at one flat ₹399. Canva-style inline editor, live countdown, Get Directions & WhatsApp sharing. Preview with watermark, then publish.',
+    title: 'WEB INVITES — ₹299 Flat • Digital Wedding & Event Invitations',
+    description: '10 premium templates at one flat ₹299. Canva-style inline editor, live countdown, Get Directions & WhatsApp sharing. Preview with watermark, then publish.',
     type: 'website',
     url: 'https://webinvites.shop',
     images: [
@@ -119,7 +120,7 @@ export default function RootLayout({ children }) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </head>
       <body className="antialiased">
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

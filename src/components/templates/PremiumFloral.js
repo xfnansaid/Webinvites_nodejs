@@ -98,6 +98,9 @@ const defaultData = {
   setting: "By the Pool",
   venue: "The Lyle Hotel",
   venueAddress: "1731 New Hampshire Ave NW, Washington, DC 20009",
+  mapsUrl: "https://www.google.com/maps/search/?api=1&query=The+Lyle+Hotel+Washington+DC",
+  mapUrl: "https://www.google.com/maps/search/?api=1&query=The+Lyle+Hotel+Washington+DC",
+  directionsUrl: "https://www.google.com/maps/search/?api=1&query=The+Lyle+Hotel+Washington+DC",
   countdownSubtitle: "Interactive Countdown Timer",
   countdownTitle: "Build excitement for the big day",
   locationSubtitle: "Google Maps Navigation",
@@ -112,7 +115,11 @@ const defaultData = {
 
 export default function WeddingTemplate({ data = {}, isDraft = false, editable = false, onEdit }) {
   // Merge default data with incoming props
-  const currentData = { ...defaultData, ...data };
+  const mergedData = { ...defaultData, ...data };
+  // Resolve canonical map URL from any field name, with fallback to auto-construct
+  const canonicalMapUrl = mergedData.mapsUrl || mergedData.mapUrl || mergedData.directionsUrl
+    || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mergedData.venue + ' ' + mergedData.venueAddress)}`;
+  const currentData = { ...mergedData, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   // Toast Notification State
   const [toastMessage, setToastMessage] = useState(null);
@@ -721,7 +728,7 @@ export default function WeddingTemplate({ data = {}, isDraft = false, editable =
             <motion.a 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentData.venue + ' ' + currentData.venueAddress)}`}
+              href={currentData.mapsUrl}
               target="_blank" 
               rel="noopener noreferrer"
               className="w-full py-3.5 px-4 rounded-md bg-[#183c36] text-white text-xs font-semibold uppercase tracking-widest flex items-center justify-center gap-2 shadow-md hover:bg-[#112c28] transition-colors"

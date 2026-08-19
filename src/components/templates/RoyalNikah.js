@@ -109,6 +109,9 @@ const DEFAULT_DATA = {
   venueName: 'The Raviz Kadavu',
   venueCity: 'Kozhikode (Calicut), Kerala',
   venueAddress: 'NH 66, Bypass Road, Azhinjilam, Kerala 673632.\nJoin us as we celebrate love, heritage, and togetherness.',
+  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=The+Raviz+Kadavu+Kozhikode',
+  mapUrl: 'https://www.google.com/maps/search/?api=1&query=The+Raviz+Kadavu+Kozhikode',
+  directionsUrl: 'https://www.google.com/maps/search/?api=1&query=The+Raviz+Kadavu+Kozhikode',
   countdownTitle: 'Counting Down To Forever',
   footerBlessing: 'With blessings from family & friends • Malabar, Kerala • October 2026'
 };
@@ -123,7 +126,13 @@ export default function WeddingTemplate({
   onEdit
 }) {
   // Merge user provided data with default fallbacks
-  const mergedData = { ...DEFAULT_DATA, ...data };
+  const baseData = { ...DEFAULT_DATA, ...data };
+  // Resolve canonical map URL from any field name
+  const mapDefault = (baseData.venueName || baseData.venueCity || baseData.venueAddress)
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((baseData.venueName || '') + ' ' + (baseData.venueCity || '') + ' ' + (baseData.venueAddress || ''))}`
+    : "";
+  const canonicalMapUrl = baseData.mapsUrl || baseData.mapUrl || baseData.directionsUrl || mapDefault;
+  const mergedData = { ...baseData, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   // Generate dynamic initials for monogram / seal / footer logo
   const groomInitial = mergedData.groomName ? mergedData.groomName.trim().charAt(0).toUpperCase() : 'F';
@@ -397,6 +406,16 @@ export default function WeddingTemplate({
                 placeholder="NH 66, Bypass Road, Azhinjilam, Kerala 673632. Join us as we celebrate love, heritage, and togetherness."
               />
             </p>
+            {/* Get Directions Button */}
+            <a
+              href={mergedData.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#F4E096] font-jakarta font-semibold text-[11px] uppercase tracking-[0.15em] hover:bg-[#D4AF37]/20 transition-colors mx-auto md:mx-0"
+            >
+              <MapPin size={14} />
+              View on Google Maps
+            </a>
           </div>
 
           {/* Right: Live Countdown Dashboard */}

@@ -112,6 +112,10 @@ export default function WeddingInvitationTemplate({
     mapButtonText: "View on Google Maps",
     mapUrl:
       "https://maps.google.com/?q=Manthan+Beach+Resort+Kapu+Udupi",
+    mapsUrl:
+      "https://maps.google.com/?q=Manthan+Beach+Resort+Kapu+Udupi",
+    directionsUrl:
+      "https://maps.google.com/?q=Manthan+Beach+Resort+Kapu+Udupi",
 
     footerTitle: "We look forward to celebrating with you!",
     footerLocation: "Kapu Beach • Udupi • Karnataka",
@@ -122,10 +126,16 @@ export default function WeddingInvitationTemplate({
     musicUrl: "",
   };
 
-  const invitation = {
+  const baseInvitation = {
     ...defaults,
     ...(data || {}),
   };
+  // Resolve canonical map URL from any field name
+  const mapDefault = baseInvitation.venue || baseInvitation.venueAddress
+    ? `https://maps.google.com/?q=${encodeURIComponent((baseInvitation.venue || '') + ' ' + (baseInvitation.venueAddress || ''))}`
+    : "";
+  const canonicalMapUrl = baseInvitation.mapsUrl || baseInvitation.mapUrl || baseInvitation.directionsUrl || mapDefault;
+  const invitation = { ...baseInvitation, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   const parseWeddingDate = React.useCallback(() => {
     const combined = `${invitation.weddingDate} ${invitation.weddingTime}`;

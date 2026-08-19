@@ -123,6 +123,9 @@ const DEFAULT_DATA = {
   venue: "The Leela Raviz Kovalam",
   venueAddress: "Beach Road, Kovalam, Thiruvananthapuram, Kerala 695527",
   venueCity: "Thiruvananthapuram, Kerala",
+  mapsUrl: "https://www.google.com/maps/search/?api=1&query=The+Leela+Raviz+Kovalam",
+  mapUrl: "https://www.google.com/maps/search/?api=1&query=The+Leela+Raviz+Kovalam",
+  directionsUrl: "https://www.google.com/maps/search/?api=1&query=The+Leela+Raviz+Kovalam",
   dressCode: "Traditional Kerala Kasavu or Formal Ethnic",
   
   // Titles & Headings
@@ -153,7 +156,13 @@ export default function WeddingInvitation({
   onEdit 
 }) {
   // Merge prop data with fallbacks
-  const mergedData = { ...DEFAULT_DATA, ...data };
+  const baseData = { ...DEFAULT_DATA, ...data };
+  // Resolve canonical map URL from any field name
+  const mapDefault = (baseData.venue || baseData.venueAddress)
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((baseData.venue || '') + ' ' + (baseData.venueAddress || ''))}`
+    : "";
+  const canonicalMapUrl = baseData.mapsUrl || baseData.mapUrl || baseData.directionsUrl || mapDefault;
+  const mergedData = { ...baseData, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   // Helper to handle edits
   const handleEdit = (field, value) => {
@@ -792,6 +801,16 @@ export default function WeddingInvitation({
                 placeholder="Beach Road, Kovalam, Thiruvananthapuram, Kerala 695527"
               />
             </small>
+            {/* Get Directions Button */}
+            <a
+              href={mergedData.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5E2129] text-[#F5EFE0] font-sans font-semibold text-[11px] uppercase tracking-[0.15em] hover:bg-[#4a1a21] transition-colors shadow-sm mx-auto"
+            >
+              <MapPin size={14} />
+              Get Directions
+            </a>
           </div>
 
           {/* Dress Code Row */}

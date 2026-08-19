@@ -124,6 +124,8 @@ const defaultData = {
   venueMapTitle: "THE RAVIZ KADAVU RESORT",
   venueMapAddress: "NH 66, Bypass Road, Calicut (Kozhikode), Kerala 673633",
   mapsUrl: "https://maps.google.com/?q=The+Raviz+Kadavu+Kozhikode+Kerala",
+  mapUrl: "https://maps.google.com/?q=The+Raviz+Kadavu+Kozhikode+Kerala",
+  directionsUrl: "https://maps.google.com/?q=The+Raviz+Kadavu+Kozhikode+Kerala",
 
   // Contact / RSVP
   phone: "+91 98460 12345",
@@ -164,7 +166,13 @@ export default function WeddingTemplate({
   onEdit = () => {} 
 }) {
   // Merge prop data with fallbacks
-  const mergedData = { ...defaultData, ...data };
+  const baseData = { ...defaultData, ...data };
+  // Resolve canonical map URL from any field name
+  const mapDefault = (baseData.venueName || baseData.venueMapTitle || baseData.venueAddress)
+    ? `https://maps.google.com/?q=${encodeURIComponent((baseData.venueName || '') + ' ' + (baseData.venueMapAddress || baseData.venueAddress || ''))}`
+    : "";
+  const canonicalMapUrl = baseData.mapsUrl || baseData.mapUrl || baseData.directionsUrl || mapDefault;
+  const mergedData = { ...baseData, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
   // Countdown state
   const [timeLeft, setTimeLeft] = useState({

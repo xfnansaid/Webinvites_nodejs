@@ -188,12 +188,22 @@ export default function WeddingInvitationTemplate({
 
     heroBackgroundImage:
       "https://one-tawny-two.vercel.app/0007/Beige%20and%20Pink%20Watercolor%20Wedding%20Invitation.png",
+
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=123+Anywhere+St+Any+City+ST+12345",
+    mapUrl: "https://www.google.com/maps/search/?api=1&query=123+Anywhere+St+Any+City+ST+12345",
+    directionsUrl: "https://www.google.com/maps/search/?api=1&query=123+Anywhere+St+Any+City+ST+12345",
   };
 
-  const values = {
+  const baseValues = {
     ...defaults,
     ...(data || {}),
   };
+  // Resolve canonical map URL from any field name
+  const mapDefault = (baseValues.venue || baseValues.venueAddress)
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((baseValues.venue || '') + ' ' + (baseValues.venueAddress || ''))}`
+    : "";
+  const canonicalMapUrl = baseValues.mapsUrl || baseValues.mapUrl || baseValues.directionsUrl || mapDefault;
+  const values = { ...baseValues, mapsUrl: canonicalMapUrl, mapUrl: canonicalMapUrl, directionsUrl: canonicalMapUrl };
 
 
   /* =======================================================
@@ -1122,6 +1132,42 @@ export default function WeddingInvitationTemplate({
               />
 
             </div>
+
+            {/* Get Directions Button */}
+            <a
+              href={values.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="
+                mt-4
+                inline-flex
+                items-center
+                gap-2
+                px-5
+                py-2.5
+
+                rounded-[16px]
+                border
+                border-[rgba(212,175,55,0.5)]
+                bg-[rgba(212,175,55,0.12)]
+
+                text-[#5a3c26]
+                text-[0.7rem]
+                font-semibold
+                uppercase
+                tracking-[0.15em]
+
+                hover:bg-[rgba(212,175,55,0.22)]
+                transition-colors
+
+                sm:text-[0.8rem]
+                sm:px-6
+                sm:py-3
+              "
+            >
+              <MapPin size={14} />
+              Get Directions
+            </a>
 
           </div>
 
