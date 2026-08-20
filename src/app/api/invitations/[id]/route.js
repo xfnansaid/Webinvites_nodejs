@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { supabaseServer, isServiceRoleConfigured } from '@/lib/supabase-server';
 import { resolveSupabaseUser } from '@/lib/auth-server';
 
+// IMPORTANT: This API MUST always hit the live DB so client edit saves are
+// reflected IMMEDIATELY on the next GET /i/[slug] page load.  Without
+// `export const dynamic = 'force-dynamic'`, Next.js Full Route Cache would
+// serve stale HTTP responses on Hostinger production deployments.
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // Coerce weddingDate to ISO
 function coerceToIsoDate(value) {
   if (!value) return null;
