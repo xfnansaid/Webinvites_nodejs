@@ -141,7 +141,11 @@ function EditorInner({ params }) {
     }
     setLoadingInvite(true);
     setLoadError('');
-    fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, { cache: 'no-store' })
+    fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      ...(authHeaders ? { headers: authHeaders } : {}),
+    })
       .then(async res => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -181,16 +185,6 @@ function EditorInner({ params }) {
     templateId: resolvedTemplateId,
   }), [templateData, resolvedTemplateId]);
 
-  // Payment banner should UPDATE existing row (by invitationId) instead of inserting new
-  const PaymentBannerWithExisting = invitationId ? (
-    <PaymentBanner
-      formData={bannerFormData}
-      templateId={resolvedTemplateId}
-      existingInvitationId={invitationId}
-      invitationAlreadyPaid={!!invitation?.is_paid}
-    />
-  ) : null;
-
   // Save (PATCH) — no republish, just instant DB update
   const handleSaveChanges = async () => {
     setSaving(true);
@@ -199,7 +193,11 @@ function EditorInner({ params }) {
       const canonical = formData.mapsUrl || formData.mapUrl || formData.directionsUrl;
       const res = await fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: {
+          ...(authHeaders || {}),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           templateId: resolvedTemplateId,
           groomName: formData.groomName,
@@ -230,6 +228,20 @@ function EditorInner({ params }) {
       setTimeout(() => setSaveMsg({ tone: '', text: '' }), 5000);
     }
   };
+
+  // Payment banner should UPDATE existing row (by invitationId) instead of inserting new.
+  // NOTE: This const MUST be declared AFTER `handleSaveChanges` (above) so that when
+  // `invitation?.is_paid` is true and we pass `onAfterSignInAutoPublish = handleSaveChanges`,
+  // the function reference is in scope (no temporal dead zone).
+  const PaymentBannerWithExisting = invitationId ? (
+    <PaymentBanner
+      formData={bannerFormData}
+      templateId={resolvedTemplateId}
+      existingInvitationId={invitationId}
+      invitationAlreadyPaid={!!invitation?.is_paid}
+      onAfterSignInAutoPublish={invitation?.is_paid ? handleSaveChanges : undefined}
+    />
+  ) : null;
 
   const handleResetToDB = () => {
     if (!invitation) return;
