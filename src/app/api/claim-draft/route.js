@@ -1,0 +1,181 @@
+import { NextResponse } from 'next/server';
+import { supabaseServer } from '@/lib/supabase-server';
+import { resolveSupabaseUser } from '@/lib/auth-server';
+
+export const dynamic = 'force-dynamic';
+
+// POST /api/claim-draft — associate an anonymous "temp_owner_token" draft
+// invitation with the currently signed-in Supabase user.
+//
+// Accepts: { tempOwnerToken: string }
+//
+// Server logic:
+//   1. Resolve signed-in user (Bearer auth header fallback or sb-<ref>-auth-token cookie).
+//   2. Look up invitations.temp_owner_token = $1 (unique index, so O(1)).
+//   3. If no row → 404.
+//   4. If row.owner_id IS NOT NULL:
+//        a. If it matches user.id → return success (idempotent / already claimed).
+//        b. Else → 409 CONFLICT, draft already claimed by another account.
+//   5. Else (owner_id IS NULL, still anonymous):
+//        UPDATE SET owner_id = user.id,
+//                   owner_phone = user.phone (if any),
+//                   temp_owner_token = NULL (so token can't be reused)
+//        WHERE id = draft.id.
+//   6. Return the full invitation row so the editor page can restore form state
+//      from DB (the authoritative source) instead of localStorage.
+export async function POST(request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const tempOwnerToken = String(body?.tempOwnerToken || '').trim();
+
+    if (!tempOwnerToken) {
+      return NextResponse.json(
+        { error: 'tempOwnerToken is required to claim a draft.', code: 'TOKEN_REQUIRED' },
+        { status: 400 },
+      );
+    }
+
+    // 1. Resolve signed-in user.
+    const { user, resolution } = await resolveSupabaseUser(request);
+    if (!user) {
+      return NextResponse.json(
+        {
+          error: 'Sign in to claim a draft.',
+          code: 'AUTH_REQUIRED',
+          hint:
+            resolution === 'none'
+              ? 'Server could not resolve a signed-in user. Ensure cookies are sent or Authorization: Bearer header is attached.'
+              : `Resolution path=${resolution} returned null user. Sign out and back in with Google.`,
+        },
+        { status: 401 },
+      );
+    }
+
+    // 2. Find the draft row via unique temp_owner_token index.
+    const { data: draft, error: findErr } = await supabaseServer
+      .from('invitations')
+      .select('*')
+      .eq('temp_owner_token', tempOwnerToken)
+      .maybeSingle();
+
+    if (findErr) throw findErr;
+
+    if (!draft) {
+      return NextResponse.json(
+        {
+          error:
+            'This draft token has expired or was already claimed. Go back to the editor page and save a new draft.',
+          code: 'NOT_FOUND',
+        },
+        { status: 404 },
+      );
+    }
+
+    // 3. Idempotency / conflict checks.
+    const ownerId = user.id;
+    const ownerPhone = user.phone || user.user_metadata?.phone || null;
+
+    if (draft.owner_id) {
+      if (String(draft.owner_id) === String(ownerId)) {
+        return NextResponse.json({
+          ok: true,
+          claimed: true,
+          alreadyClaimed: true,
+          invitation: draft,
+          ownerId,
+          message: 'Draft was already claimed by this account.',
+        });
+      }
+      return NextResponse.json(
+        {
+          error: 'This draft has already been claimed by another user account.',
+          code: 'ALREADY_CLAIMED',
+          claimedBy: String(draft.owner_id),
+        },
+        { status: 409 },
+      );
+    }
+
+    // 4. CLAIM: assign owner_id, preserve any user.phone / user.email, clear
+    // temp_owner_token so token can never be reused. Also bump status to
+    // 'draft' if it was NULL (legacy rows) so dashboard treats it consistently.
+    const ownerEmail =
+      (user.email && typeof user.email === 'string' ? user.email.trim().toLowerCase() : '') ||
+      (user.user_metadata && typeof user.user_metadata.email === 'string'
+        ? user.user_metadata.email.trim().toLowerCase()
+        : '') ||
+      null;
+
+    const patch = {
+      owner_id: ownerId,
+      ...(ownerPhone ? { owner_phone: ownerPhone } : {}),
+      ...(ownerEmail ? { owner_email: ownerEmail } : {}),
+      temp_owner_token: null,
+      status: draft.status || 'draft',
+    };
+
+    const { data: updated, error: upErr } = await supabaseServer
+      .from('invitations')
+      .update(patch)
+      .eq('id', draft.id)
+      .select()
+      .single();
+
+    if (upErr) throw upErr;
+
+    return NextResponse.json({
+      ok: true,
+      claimed: true,
+      alreadyClaimed: false,
+      invitation: updated,
+      ownerId,
+      authResolution: resolution,
+    });
+  } catch (err) {
+    console.error('/api/claim-draft error:', err);
+    const missingColumn =
+      String(err?.code || '') === '42703' ||
+      /column\s+"temp_owner_token"\s+does\s+not\s+exist/i.test(String(err?.message || ''));
+    const missingOwnerEmailColumn =
+      String(err?.code || '') === '42703' ||
+      /column\s+"owner_email"\s+does\s+not\s+exist/i.test(String(err?.message || ''));
+
+    const copyableSql = missingOwnerEmailColumn
+      ? `-- Run in Supabase Dashboard → SQL Editor → New Query → Run
+ALTER TABLE public.invitations ADD COLUMN IF NOT EXISTS owner_email text
+  CONSTRAINT invitations_owner_email_maxlen CHECK (char_length(owner_email) <= 254);
+CREATE INDEX IF NOT EXISTS invitations_owner_email_idx
+  ON public.invitations (owner_email);
+CREATE INDEX IF NOT EXISTS invitations_owner_id_email_idx
+  ON public.invitations (owner_id, owner_email);
+-- (Plus draft/temp_owner_token columns if not yet added:)
+ALTER TABLE public.invitations ADD COLUMN IF NOT EXISTS temp_owner_token text
+  CONSTRAINT invitations_temp_owner_token_maxlen CHECK (char_length(temp_owner_token) <= 80);
+CREATE UNIQUE INDEX IF NOT EXISTS invitations_temp_owner_token_idx
+  ON public.invitations (temp_owner_token);
+ALTER TABLE public.invitations ADD COLUMN IF NOT EXISTS status text
+  CONSTRAINT invitations_status_allowed CHECK (status IS NULL OR status IN ('draft', 'paid', 'archived'));`
+      : missingColumn
+      ? `-- Run in Supabase Dashboard → SQL Editor → New Query, then retry.
+ALTER TABLE public.invitations ADD COLUMN IF NOT EXISTS temp_owner_token text
+  CONSTRAINT invitations_temp_owner_token_maxlen CHECK (char_length(temp_owner_token) <= 80);
+CREATE UNIQUE INDEX IF NOT EXISTS invitations_temp_owner_token_idx
+  ON public.invitations (temp_owner_token);
+ALTER TABLE public.invitations ADD COLUMN IF NOT EXISTS status text
+  CONSTRAINT invitations_status_allowed CHECK (status IS NULL OR status IN ('draft', 'paid', 'archived'));`
+      : null;
+
+    return NextResponse.json(
+      {
+        error: err?.message || 'Failed to claim draft.',
+        code: err?.code || 'CLAIM_DRAFT_FAILED',
+        details: err?.details || err?.hint || null,
+        copyableSql,
+        hint: missingOwnerEmailColumn || missingColumn
+          ? 'NEW COLUMNS REQUIRED (30-second fix): 1) Supabase Dashboard → SQL Editor → New Query. 2) Paste the SQL snippet above → RUN (green arrow). 3) Refresh the browser and retry.'
+          : 'See Next.js server terminal for the full stack trace.',
+      },
+      { status: 500 },
+    );
+  }
+}
