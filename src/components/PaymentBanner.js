@@ -221,11 +221,121 @@ export default function PaymentBanner({
   }, [session]);
 
   /**
+   * Edits-only save flow — free, unlimited edits for any invitation that is
+   * ALREADY PAID (invitationAlreadyPaid=true).  Used by:
+   *   - Admin operator accounts clicking "Save edits & update live site"
+   *   - Any signed-in customer editing a template they already paid for
+   *
+   * Instead of re-charging ₹299 or hitting the admin-publish flow (which
+   * would assign a new fake razorpay order_id), we just PATCH the existing
+   * invitation in-place with the latest formData, then redirect to live page.
+   */
+  const handleSaveEditsOnly = useCallback(async (overrideFormData = null, overrideExistingId = null) => {
+    setLastError(null);
+    const invitationId = overrideExistingId || existingInvitationId;
+    if (!invitationId) {
+      // Sanity guard — if no existing invitationId, fall through to normal
+      // admin publish / Razorpay (will be handled by caller after return).
+      return false;
+    }
+
+    try {
+      setLoading(true);
+
+      const fd = overrideFormData || formData;
+      const canonical = fd.mapsUrl || fd.mapUrl || fd.directionsUrl;
+
+      let response;
+      try {
+        response = await fetch(`/api/invitations/${encodeURIComponent(invitationId)}`, {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            templateId: fd.templateId || templateId,
+            groomName: fd.groomName,
+            brideName: fd.brideName,
+            weddingDate: fd.weddingDate,
+            weddingTime: fd.weddingTime,
+            venue: fd.venue,
+            venueAddress: fd.venueAddress,
+            mapsUrl: canonical,
+            whatsappNumber: fd.whatsappNumber,
+            groomParents: fd.groomParents,
+            brideParents: fd.brideParents,
+            heroTagline: fd.heroTagline,
+            heroEventText: fd.heroEventText,
+            countdownTitle: fd.countdownTitle,
+          }),
+        });
+      } catch (netErr) {
+        setLastError({
+          message: 'Could not reach the server. Please check your internet connection.',
+          code: 'NETWORK',
+          hint: netErr?.message || 'fetch() failed before reaching /api/invitations/[id] (PATCH route).',
+        });
+        return true;
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.error) {
+        setLastError({
+          message: data?.error || `Server responded ${response.status}`,
+          code: data?.code || `HTTP_${response.status}`,
+          hint: data?.hint || data?.details || 'See Next.js server terminal for stack trace.',
+          copyableSql: data?.copyableSql || null,
+        });
+        return true;
+      }
+
+      // Save success — redirect to live page with success flag (shows the
+      // "Congratulations · Template published successfully" banner so user
+      // gets a clear confirmation that their edits went live).
+      const slug = data?.invitation?.slug || null;
+      if (!slug) {
+        setLastError({
+          message: 'Saved to database — but we could not find the live page slug.',
+          hint: 'Open Dashboard → click "Open live link" on the invitation card to confirm.',
+        });
+        return true;
+      }
+
+      router.push(`/i/${slug}?success=true`);
+      return true;
+    } catch (unexpectedErr) {
+      console.error('Unexpected handleSaveEditsOnly error:', unexpectedErr);
+      setLastError({
+        message: unexpectedErr?.message || 'Something unexpected happened.',
+        code: 'UNEXPECTED',
+        hint: 'Screenshot the DevTools Console red errors and send to support.',
+      });
+      return true;
+    } finally {
+      setLoading(false);
+    }
+  }, [router, templateId, formData, existingInvitationId, authHeaders]);
+
+  /**
    * Admin publish flow — called in place of Razorpay for whitelisted Google
    * accounts. Hits /api/admin-publish which server-side validates admin email
    * via Supabase auth cookies and writes invitation with is_paid=true.
+   *
+   * SHORT-CIRCUIT for already-paid invites: if invitationAlreadyPaid we use
+   * handleSaveEditsOnly() instead, which saves for free (no fake admin order
+   * id rewrite, no redirect logic divergence) — same for customers & admins.
    */
   const handleAdminPublish = useCallback(async (overrideFormData = null, overrideExistingId = null) => {
+    // If editing existing paid invite: save edits only (no order rewrite)
+    const invitationId = overrideExistingId || existingInvitationId;
+    if (invitationAlreadyPaid && invitationId) {
+      const handled = await handleSaveEditsOnly(overrideFormData, overrideExistingId);
+      if (handled) return;
+    }
+
     setLastError(null);
     try {
       setLoading(true);
@@ -233,8 +343,8 @@ export default function PaymentBanner({
       const payload = {
         ...(overrideFormData || formData),
         templateId,
-        ...((overrideExistingId || existingInvitationId)
-          ? { invitationId: overrideExistingId || existingInvitationId }
+        ...((invitationId)
+          ? { invitationId }
           : {}),
       };
 
@@ -280,7 +390,7 @@ export default function PaymentBanner({
     } finally {
       setLoading(false);
     }
-  }, [router, templateId, formData, existingInvitationId, authHeaders]);
+  }, [router, templateId, formData, existingInvitationId, authHeaders, handleSaveEditsOnly, invitationAlreadyPaid]);
 
   /**
    * The unified Publish Now flow.
@@ -294,13 +404,34 @@ export default function PaymentBanner({
   const handlePay = useCallback(async (overrideFormData = null, overrideExistingId = null) => {
     setLastError(null);
 
+    // ========================================================================
+    // EDITS-ONLY SAVE (FREE, unlimited for paid invites)
+    //
+    // If this is an ALREADY-PAID invitation that the user is editing, we
+    // never charge again and never re-run admin-publish's order rewrite:
+    // just PATCH the row in place (same code as handleSaveChanges on the
+    // edit page) → redirect to /i/[slug]?success=true for confirmation toast.
+    //
+    // This handles BOTH:
+    //   * Admin operator account clicking "Save edits & update live site"
+    //   * Regular signed-in customer editing a template they already paid for
+    //
+    // We do this check FIRST so it applies to EVERYONE regardless of admin
+    // status / sign-in gate.
+    // ========================================================================
+    const existingId = overrideExistingId || existingInvitationId;
+    if (invitationAlreadyPaid && existingId) {
+      const handled = await handleSaveEditsOnly(overrideFormData, overrideExistingId);
+      if (handled) return;
+    }
+
     // SIGN-IN GATE: If user is not authenticated, stage everything and
     // redirect to Google sign-in flow. 10-second cached auth check only (no spinner).
     if (!authLoading && !user) {
       stageEditsAndRedirect({
         formData: overrideFormData || formData,
         templateId,
-        existingInvitationId: overrideExistingId || existingInvitationId,
+        existingInvitationId: existingId,
         router,
         signInWithGoogle,
         session,
@@ -319,7 +450,7 @@ export default function PaymentBanner({
         stageEditsAndRedirect({
           formData: overrideFormData || formData,
           templateId,
-          existingInvitationId: overrideExistingId || existingInvitationId,
+          existingInvitationId: existingId,
           router,
           signInWithGoogle,
           session,
@@ -465,7 +596,7 @@ export default function PaymentBanner({
       // No-op for happy/sad paths that set loading explicitly; this protects
       // against any unhandled throw leaving the button stuck.
     }
-  }, [authLoading, user, isAdmin, handleAdminPublish, router, templateId, formData, existingInvitationId, userPhone, authHeaders]);
+  }, [authLoading, user, isAdmin, handleAdminPublish, router, templateId, formData, existingInvitationId, userPhone, authHeaders, handleSaveEditsOnly, invitationAlreadyPaid]);
 
   // Sync ref immediately after the callback is assigned — any earlier effect
   // (like the auto-resume effect above) that reads this ref inside a
