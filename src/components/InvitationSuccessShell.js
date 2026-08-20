@@ -394,9 +394,7 @@ export default function InvitationSuccessShell({
 
               <div className="relative p-5 sm:p-7 md:p-8">
                 <div className="flex items-start gap-4 sm:gap-5">
-                  <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-white shadow-inner flex items-center justify-center text-[var(--emerald-primary)] ring-1 ring-[var(--emerald-primary)]/15">
-                    <PartyPopper className="w-7 h-7 sm:w-8 sm:h-8" />
-                  </div>
+
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--emerald-primary)] text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-widest">
