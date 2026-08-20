@@ -1,11 +1,29 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 import { templates } from '@/components/templates';
 import InvitationSuccessShell from '@/components/InvitationSuccessShell';
 
+// ============================================================================
+// CACHE BEHAVIOR — this page MUST show the LATEST invitation edits instantly
+// because clients save edits and expect the live /i/[slug] page to update
+// the very next page load.  By default Next.js App Router caches fetch() / DB
+// reads in the "Data Cache" on disk (.next/cache) — FOREVER, never expires.
+// That was the root cause of:
+//   "after they made edits to their template again and hit save edits &
+//    update live site, their existing site is not changing, it's showing the
+//    old saved edited template."
+// ============================================================================
+export const revalidate = 0;                 // never cache this server response
+export const dynamic = 'force-dynamic';      // never static-render this route
+export const fetchCache = 'force-no-store';  // disable fetch() data cache inside
+
 async function getInvitation(slug) {
-  const { data, error } = await supabase
+  // `supabaseServer` = service role server client (bypasses RLS for reading
+  // invites).  Using browser anon client here caused two problems:
+  //   1) It's designed for client-side usage, not server components.
+  //   2) Next.js Data Cache silently cached the first .select() result forever.
+  const { data, error } = await supabaseServer
     .from('invitations')
     .select('*')
     .eq('slug', slug)
