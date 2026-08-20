@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import {
   ArrowLeft,
   Loader2,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth, consumeAuthRedirectNext, userInitials, userDisplayName } from '@/lib/auth';
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading, signInWithGoogle, oauthError, userAvatar } = useAuth();
@@ -252,5 +252,17 @@ export default function SignInPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-[#FAF8F5] text-[var(--ink)] flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--emerald-primary)]" />
+      </main>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }
