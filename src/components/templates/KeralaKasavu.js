@@ -7,8 +7,6 @@ import {
   Clock,
   MapPin,
   Sparkles,
-  Volume2,
-  VolumeX,
   ChevronDown,
   Heart,
   Users,
@@ -218,35 +216,130 @@ const CountdownCard = ({ value, label }) => (
   </motion.div>
 );
 
+function formatWeddingDate(dateStr) {
+  if (!dateStr) return '';
+  if (dateStr.includes(',')) return dateStr;
+  const clean = dateStr.trim();
+  const d = new Date(clean.includes('T') ? clean : `${clean}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatWeddingTime(timeStr) {
+  if (!timeStr) return '10:00 AM';
+  const s = String(timeStr).trim();
+  if (/am|pm/i.test(s)) return s;
+  const match = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return s;
+}
+
 export default function WeddingInvitation({
   data = {},
   editable = false,
   onEdit,
 }) {
+  const brideName = data.brideName || DEFAULT_DATA.brideName;
+  const groomName = data.groomName || DEFAULT_DATA.groomName;
+  const weddingDate = data.weddingDate || DEFAULT_DATA.weddingDate;
+  const weddingTime =
+    data.weddingTime || data.muhurthamTime || DEFAULT_DATA.muhurthamTime;
+  const formattedTime = formatWeddingTime(weddingTime);
+  const venue = data.venue || DEFAULT_DATA.venue;
+  const venueAddress = data.venueAddress || DEFAULT_DATA.venueAddress;
+  const brideParents = data.brideParents || DEFAULT_DATA.brideParents;
+  const groomParents = data.groomParents || DEFAULT_DATA.groomParents;
+  const tagline = data.heroTagline || data.tagline || DEFAULT_DATA.tagline;
+  const countdownTitle = data.countdownTitle || DEFAULT_DATA.countdownTitle;
+  const weddingDateFormatted =
+    data.weddingDateFormatted ||
+    (data.weddingDate
+      ? formatWeddingDate(data.weddingDate)
+      : DEFAULT_DATA.weddingDateFormatted);
+
   const baseData = {
     ...DEFAULT_DATA,
     ...data,
+    brideName,
+    groomName,
+    weddingDate,
+    weddingTime,
+    muhurthamTime: formattedTime,
+    venue,
+    venueAddress,
+    brideParents,
+    groomParents,
+    tagline,
+    heroTagline: tagline,
+    countdownTitle,
+    weddingDateFormatted,
   };
 
   const generatedMapUrl =
     baseData.venue || baseData.venueAddress
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          `${baseData.venue || ''} ${baseData.venueAddress || ''}`
+          `${baseData.venue || ''} ${baseData.venueAddress || ''}`.trim()
         )}`
       : '';
 
+  const canonicalMapUrl =
+    data.mapsUrl ||
+    data.mapUrl ||
+    data.directionsUrl ||
+    baseData.mapsUrl ||
+    generatedMapUrl;
+
   const mergedData = {
     ...baseData,
-    mapsUrl: baseData.mapsUrl || generatedMapUrl,
+    mapsUrl: canonicalMapUrl,
+    mapUrl: canonicalMapUrl,
+    directionsUrl: canonicalMapUrl,
   };
 
   const handleEdit = (field, value) => {
-    if (onEdit) {
-      onEdit(field, value);
+    if (!onEdit) return;
+
+    onEdit(field, value);
+
+    if (field === 'weddingDateFormatted' || field === 'weddingDate') {
+      onEdit('weddingDate', value);
+      onEdit('weddingDateFormatted', formatWeddingDate(value));
+    } else if (field === 'muhurthamTime' || field === 'weddingTime') {
+      onEdit('weddingTime', value);
+      onEdit('muhurthamTime', value);
+    } else if (field === 'tagline' || field === 'heroTagline') {
+      onEdit('heroTagline', value);
+      onEdit('tagline', value);
+    } else if (field === 'venue') {
+      onEdit('venue', value);
+    } else if (field === 'venueAddress') {
+      onEdit('venueAddress', value);
+    } else if (field === 'brideName') {
+      onEdit('brideName', value);
+    } else if (field === 'groomName') {
+      onEdit('groomName', value);
+    } else if (field === 'brideParents') {
+      onEdit('brideParents', value);
+    } else if (field === 'groomParents') {
+      onEdit('groomParents', value);
+    } else if (field === 'countdownTitle') {
+      onEdit('countdownTitle', value);
     }
   };
 
   const displayMonogram =
+    data.monogram ||
     mergedData.monogram ||
     `${(mergedData.brideName || 'S').charAt(0)} & ${(mergedData.groomName || 'V').charAt(0)}`;
 
@@ -259,12 +352,33 @@ export default function WeddingInvitation({
 
   useEffect(() => {
     const calculateTime = () => {
-      const dateStr =
-        mergedData.weddingDate || '2026-09-12';
+      const dateStr = String(mergedData.weddingDate || '2026-09-12').trim();
+      const timeStr = String(mergedData.weddingTime || '08:00:00').trim();
 
-      const targetDate = new Date(
-        `${dateStr}T08:00:00`
-      ).getTime();
+      let targetDate;
+      const isoDateMatch = dateStr.match(/\d{4}-\d{2}-\d{2}/);
+      const isoDate = isoDateMatch ? isoDateMatch[0] : '2026-09-12';
+
+      let hh = '08';
+      let mm = '00';
+      const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        const minutes = timeMatch[2];
+        const ampm = timeMatch[3];
+        if (ampm) {
+          if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+          if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+        }
+        hh = String(hours).padStart(2, '0');
+        mm = minutes;
+      }
+
+      targetDate = new Date(`${isoDate}T${hh}:${mm}:00`).getTime();
+
+      if (Number.isNaN(targetDate)) {
+        targetDate = new Date(`${isoDate}T08:00:00`).getTime();
+      }
 
       const now = new Date().getTime();
       const difference = targetDate - now;
@@ -311,33 +425,32 @@ export default function WeddingInvitation({
     const interval = setInterval(calculateTime, 1000);
 
     return () => clearInterval(interval);
-  }, [mergedData.weddingDate]);
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
-
-  const toggleAudio = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      return;
-    }
-
-    audioRef.current
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => {});
-  };
+  }, [mergedData.weddingDate, mergedData.weddingTime]);
 
   const handleSaveTheDate = () => {
-    const weddingDate =
-      mergedData.weddingDate || '2026-09-12';
+    const rawDate = mergedData.weddingDate || '2026-09-12';
+    const dateMatch = String(rawDate).match(/\d{4}-\d{2}-\d{2}/);
+    const dateValue = dateMatch
+      ? dateMatch[0].replace(/-/g, '')
+      : '20260912';
 
-    const dateValue = weddingDate.replace(/-/g, '');
+    const timeStr = String(mergedData.weddingTime || '08:00:00').trim();
+    let hh = '08';
+    let mm = '00';
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const minutes = timeMatch[2];
+      const ampm = timeMatch[3];
+      if (ampm) {
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      }
+      hh = String(hours).padStart(2, '0');
+      mm = minutes;
+    }
 
-    const startIso = `${dateValue}T080000`;
+    const startIso = `${dateValue}T${hh}${mm}00`;
     const endIso = `${dateValue}T220000`;
 
     const icsContent = [
@@ -381,14 +494,14 @@ export default function WeddingInvitation({
       icon: Calendar,
       label: 'The Date',
       value: mergedData.weddingDateFormatted,
-      field: 'weddingDateFormatted',
+      field: 'weddingDate',
       note: null,
     },
     {
       icon: Clock,
       label: 'Muhurtham',
       value: mergedData.muhurthamTime,
-      field: 'muhurthamTime',
+      field: 'weddingTime',
       note: mergedData.muhurthamNote,
       noteField: 'muhurthamNote',
     },
@@ -476,77 +589,6 @@ export default function WeddingInvitation({
           />
         ))}
       </div>
-
-      {/* ================= AUDIO ================= */}
-
-      {mergedData.audioUrl && (
-        <>
-          <audio
-            ref={audioRef}
-            src={mergedData.audioUrl}
-            loop
-            preload="auto"
-          />
-
-          <motion.button
-            onClick={toggleAudio}
-            whileHover={{
-              scale: 1.08,
-              y: -2,
-            }}
-            whileTap={{
-              scale: 0.94,
-            }}
-            className="
-              fixed
-              bottom-6
-              right-6
-              z-50
-              flex
-              h-14
-              w-14
-              items-center
-              justify-center
-              rounded-full
-              border
-              border-[#C6A66A]/50
-              bg-[#FFFDF9]/90
-              text-[#7A2634]
-              shadow-[0_15px_35px_rgba(75,40,30,0.12)]
-              backdrop-blur-xl
-            "
-            aria-label="Toggle Background Music"
-          >
-            {isPlaying ? (
-              <div className="relative">
-                <Volume2
-                  size={22}
-                  strokeWidth={1.5}
-                />
-
-                <motion.span
-                  className="absolute -right-3 -top-4 text-xs text-[#C6A66A]"
-                  animate={{
-                    y: [-2, -16],
-                    opacity: [0, 1, 0],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                  }}
-                >
-                  ♪
-                </motion.span>
-              </div>
-            ) : (
-              <VolumeX
-                size={22}
-                strokeWidth={1.5}
-              />
-            )}
-          </motion.button>
-        </>
-      )}
 
       {/* ================= HERO ================= */}
 
