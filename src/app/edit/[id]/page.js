@@ -486,7 +486,7 @@ function EditorInner({ params }) {
                     </label>
                     <label className="block">
                       <span className="block text-[10px] sm:text-[11px] uppercase tracking-widest font-bold text-[var(--ink-muted)] mb-1.5">Time</span>
-                      <input type="time" value={formData.weddingTime || ''} onChange={e => handleInlineEdit('weddingTime', e.target.value)}
+                      <input value={formData.weddingTime || ''} onChange={e => handleInlineEdit('weddingTime', e.target.value)} placeholder="e.g. 10:00 AM"
                         className="w-full px-3 py-2.5 rounded-xl bg-[var(--cream)]/60 ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--emerald-primary)]/40 focus:bg-white outline-none text-sm sm:text-base text-[var(--ink)]" />
                     </label>
                   </div>
