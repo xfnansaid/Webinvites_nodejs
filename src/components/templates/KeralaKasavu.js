@@ -256,6 +256,8 @@ export default function WeddingInvitation({
   const weddingTime =
     data.weddingTime || data.muhurthamTime || DEFAULT_DATA.muhurthamTime;
   const formattedTime = formatWeddingTime(weddingTime);
+  const receptionTime =
+    data.heroEventText || data.receptionTime || DEFAULT_DATA.receptionTime;
   const venue = data.venue || DEFAULT_DATA.venue;
   const venueAddress = data.venueAddress || DEFAULT_DATA.venueAddress;
   const brideParents = data.brideParents || DEFAULT_DATA.brideParents;
@@ -276,6 +278,8 @@ export default function WeddingInvitation({
     weddingDate,
     weddingTime,
     muhurthamTime: formattedTime,
+    receptionTime,
+    heroEventText: receptionTime,
     venue,
     venueAddress,
     brideParents,
@@ -318,6 +322,9 @@ export default function WeddingInvitation({
     } else if (field === 'muhurthamTime' || field === 'weddingTime') {
       onEdit('weddingTime', value);
       onEdit('muhurthamTime', value);
+    } else if (field === 'receptionTime' || field === 'heroEventText') {
+      onEdit('heroEventText', value);
+      onEdit('receptionTime', value);
     } else if (field === 'tagline' || field === 'heroTagline') {
       onEdit('heroTagline', value);
       onEdit('tagline', value);
@@ -509,7 +516,7 @@ export default function WeddingInvitation({
       icon: Heart,
       label: 'Reception',
       value: mergedData.receptionTime,
-      field: 'receptionTime',
+      field: 'heroEventText',
       note: mergedData.receptionNote,
       noteField: 'receptionNote',
     },
