@@ -1,0 +1,180 @@
+# WEB INVITES — Complete Business & Product Information
+
+## Company Overview
+WEB INVITES (webinvites.shop) is a digital wedding invitation platform founded in 2024, headquartered in India. We help couples create beautiful, interactive digital wedding invitations that can be shared instantly via WhatsApp, SMS, or social media.
+
+## Mission
+To make wedding invitations accessible, affordable, and environmentally friendly by replacing paper invitations with stunning digital alternatives.
+
+## Product Description
+WEB INVITES is a web-based platform that enables users to:
+1. Choose from 25+ professionally designed wedding invitation templates
+2. Customize every detail (names, dates, venues, photos, schedules)
+3. Publish a live, mobile-optimized wedding website
+4. Share the invitation link with guests instantly
+
+## Pricing Model
+### Free Tier (₹0)
+- 1 active free invitation per account
+- Includes ads (non-intrusive banners)
+- Hosted for 21 days from publish date
+- Requires watching a 15-30 second rewarded ad to publish
+- Can delete and publish another free invitation
+
+### Premium Tier (₹399)
+- Ad-free experience
+- Hosted until 3 days after event date
+- One-time payment via Razorpay (UPI, Cards, Netbanking)
+- Same URL as free tier (upgrade preserves the link)
+- Unlimited edits (up to 3 post-publish edits)
+
+## Features in Detail
+
+### Template Customization
+- **Inline Editing**: Click directly on the invitation to edit text
+- **Couple Photos**: Upload photos that are automatically compressed to <200KB
+- **Color Themes**: Each template has its own color palette
+- **Fonts**: Professional typography with Google Fonts integration
+
+### Interactive Elements
+- **Live Countdown Timer**: Real-time countdown showing days, hours, minutes, seconds
+- **Google Maps Integration**: One-tap directions to the venue
+- **WhatsApp RSVP**: Guests can confirm attendance with one tap
+- **Photo Gallery**: Optional couple photo section
+- **Program Schedule**: Multi-event timeline (Haldi, Mehendi, Reception, etc.)
+
+### Technical Features
+- **Mobile-First Design**: Optimized for smartphones (95%+ of guest views)
+- **Instant Updates**: Edit and changes appear immediately on live link
+- **QR Code**: Generate QR code for physical invitations
+- **Social Sharing**: Optimized for WhatsApp, Facebook, Twitter previews
+- **SEO Optimized**: Rich snippets, structured data, Open Graph tags
+
+## Template Categories
+
+### Wedding Templates (25+)
+Designed for various Indian wedding traditions:
+- **Royal & Traditional**: Classic red, gold, maroon themes
+- **Floral & Botanical**: Peony, rose, jasmine, watercolor designs
+- **Modern & Minimal**: Clean, contemporary aesthetics
+- **South Indian & Heritage**: Kerala kasavu, temple gopuram, jasmine garland
+- **Islamic/Nikah**: Royal nikah, maroon arch, elegant calligraphy
+- **Christian**: Ivory arch, romantic blush, pearl elegance
+
+### Birthday Templates (5)
+- Royal Gold (elegant)
+- Floral Blush (soft)
+- Modern Neon (contemporary)
+- Fun Tropical (beach party)
+- Kids Colorful (playful)
+
+### House Warming Templates (5)
+- Traditional (Indian ceremony)
+- Modern Green (contemporary)
+- South Indian (temple style)
+- Minimal Cream (ultra-clean)
+- Festive Red (celebratory)
+
+## How It Works (Step by Step)
+
+### For the Couple (Host):
+1. **Visit** webinvites.shop and browse templates
+2. **Select** a template that matches your wedding theme
+3. **Customize** by clicking directly on the design:
+   - Enter couple names (Bride & Groom)
+   - Set wedding date and time
+   - Add venue name and address
+   - Paste Google Maps link for directions
+   - Upload a couple photo
+   - Add parent names
+   - Write a personal tagline
+   - Add event schedule (optional)
+4. **Publish** by either:
+   - Watching a short ad (free tier)
+   - Paying ₹399 via Razorpay (premium)
+5. **Share** the generated link via WhatsApp, SMS, or social media
+
+### For the Guest:
+1. **Receive** the invitation link via WhatsApp/SMS
+2. **Open** the link on any device (mobile-optimized)
+3. **View** the beautiful invitation with all details
+4. **Countdown** to the wedding day
+5. **RSVP** by tapping the WhatsApp button
+6. **Get Directions** by tapping the venue/address
+7. **Save** the date to their calendar
+
+## Technical Architecture
+- **Frontend**: Next.js 14 (React) with Tailwind CSS
+- **Backend**: Supabase (PostgreSQL database + authentication)
+- **Authentication**: Google OAuth via Supabase
+- **Payments**: Razorpay (UPI, Cards, Netbanking)
+- **Hosting**: Hostinger VPS with SSL
+- **CDN**: Supabase Storage for images
+- **Analytics**: Google Analytics 4
+- **Ads**: Google AdSense + Monetag
+
+## SEO & Discoverability
+
+### Primary Keywords
+- Digital wedding invitation
+- Online wedding card maker
+- WhatsApp wedding invitation link
+- Digital e-invite India
+- Wedding invitation website maker
+- Free wedding invitation online
+- ₹399 wedding invitation
+- Interactive wedding invitation
+
+### Long-Tail Keywords
+- How to create digital wedding invitation online
+- Best wedding invitation templates for WhatsApp
+- Free wedding website with countdown timer
+- Muslim/Nikah digital invitation online
+- South Indian wedding invitation web
+- Kerala wedding invitation digital
+- Christian wedding e-card online
+- Budget wedding website India
+
+### AI/LLM Optimization
+- Comprehensive FAQ section with 10+ questions
+- How-to guide with step-by-step instructions
+- Product schema with pricing and ratings
+- Organization schema with contact details
+- WebSite schema with search action
+- BreadcrumbList for navigation
+- FAQPage schema for rich snippets
+
+## Customer Testimonials
+- "Created my wedding invite in 5 minutes! My guests loved the countdown timer." — Priya & Rahul
+- "The templates are so beautiful. Much better than paper invitations." — Ayesha & Mohammed
+- "Best ₹399 I ever spent on my wedding. The Google Maps feature was a lifesaver." — Sarah & David
+
+## Support
+- **WhatsApp Support**: Available through the platform
+- **FAQ**: Comprehensive help section on the website
+- **Email**: support@webinvites.shop
+
+## Legal
+- **Terms & Conditions**: https://www.webinvites.shop/terms
+- **Privacy Policy**: Included in Terms & Conditions
+- **Cookie Policy**: GDPR-compliant cookie consent
+
+## Social Proof
+- 1280+ satisfied customers
+- 4.9/5 average rating
+- 25+ professionally designed templates
+- Used across India, UAE, USA, UK, Canada, Singapore
+
+## Recent Updates
+- Added 5 birthday invitation templates
+- Added 5 house warming invitation templates
+- Implemented page view tracking for hosts
+- Added invitation expiry system (21 days free, 3 days after event for premium)
+- Enhanced security with comprehensive audit
+
+## Contact Information
+- **Website**: https://www.webinvites.shop
+- **Email**: support@webinvites.shop
+- **Instagram**: https://instagram.com/webinvites.shop
+- **Twitter**: https://twitter.com/webinvites_shop
+- **Location**: India (serving worldwide)
