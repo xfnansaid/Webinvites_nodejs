@@ -35,7 +35,7 @@ export default function MaintenanceBanner({ forceOpen = false, onForceClose = nu
 
     async function checkMaintenance() {
       try {
-        const res = await fetch('/api/site-settings', { cache: 'no-store' });
+        const res = await fetch(`/api/site-settings?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         if (data?.config?.maintenance?.enabled) {
