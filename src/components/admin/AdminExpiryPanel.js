@@ -22,16 +22,18 @@ import AdminOverviewTab from './AdminOverviewTab';
 import AdminDirectoryTab from './AdminDirectoryTab';
 import AdminRevenueTab from './AdminRevenueTab';
 import AdminAnalyticsTab from './AdminAnalyticsTab';
+import AdminAiInsightsTab from './AdminAiInsightsTab';
 import AdminMediaTab from './AdminMediaTab';
 import AdminToolsTab from './AdminToolsTab';
 import AdminSiteControlsTab from './AdminSiteControlsTab';
 import AdminGuestEngagementTab from './AdminGuestEngagementTab';
 import AdminPerformanceTab from './AdminPerformanceTab';
 import AdminActionModal from './AdminActionModal';
-import { Sliders } from 'lucide-react';
+import { Sliders, BrainCircuit } from 'lucide-react';
 
 const TABS = [
   { id: 'overview', label: 'Overview & Expiry', icon: BarChart3, badge: null },
+  { id: 'ai-insights', label: 'AI Intelligence', icon: BrainCircuit, badge: 'New' },
   { id: 'directory', label: 'Invitations Directory', icon: Users, badge: null },
   { id: 'revenue', label: 'Revenue & Orders', icon: DollarSign, badge: null },
   { id: 'controls', label: 'Site Controls', icon: Sliders, badge: null },
@@ -164,6 +166,9 @@ export default function AdminExpiryPanel() {
       <div className="transition-all duration-300">
         {activeTab === 'overview' && (
           <AdminOverviewTab data={statsData} onSelectInvitation={handleOpenActionModal} onRefresh={handleRefreshAll} onSwitchTab={setActiveTab} refreshTrigger={refreshTrigger} />
+        )}
+        {activeTab === 'ai-insights' && (
+          <AdminAiInsightsTab />
         )}
         {activeTab === 'directory' && (
           <AdminDirectoryTab onSelectInvitation={handleOpenActionModal} refreshTrigger={refreshTrigger} />
