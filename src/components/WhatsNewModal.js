@@ -29,7 +29,7 @@ export default function WhatsNewModal({ forceOpen = false, onForceClose = null, 
 
     async function loadSettings() {
       try {
-        const res = await fetch('/api/site-settings', { cache: 'no-store' });
+        const res = await fetch(`/api/site-settings?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         const whatsNew = data?.config?.whatsNew;
