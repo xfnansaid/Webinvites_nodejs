@@ -22,8 +22,10 @@ import {
 } from 'lucide-react';
 import WhatsNewModal from '@/components/WhatsNewModal';
 import MaintenanceBanner from '@/components/MaintenanceBanner';
+import { useAuth } from '@/lib/auth';
 
 export default function AdminSiteControlsTab({ refreshTrigger }) {
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(null);
@@ -60,12 +62,29 @@ export default function AdminSiteControlsTab({ refreshTrigger }) {
     }
   });
 
+  const getHeaders = useCallback(async () => {
+    const h = { 'Content-Type': 'application/json' };
+    let token = session?.access_token;
+    if (!token && typeof window !== 'undefined') {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data } = await supabase.auth.getSession();
+        token = data?.session?.access_token;
+      } catch {}
+    }
+    if (token) h.Authorization = `Bearer ${token}`;
+    return h;
+  }, [session]);
+
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     setSaveError(null);
     try {
+      const headers = await getHeaders();
       const res = await fetch(`/api/admin/site-settings?t=${Date.now()}`, {
-        cache: 'no-store'
+        cache: 'no-store',
+        headers,
+        credentials: 'same-origin'
       });
       const data = await res.json();
       if (res.ok && data?.config) {
@@ -79,7 +98,7 @@ export default function AdminSiteControlsTab({ refreshTrigger }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getHeaders]);
 
   useEffect(() => {
     fetchSettings();
@@ -90,9 +109,11 @@ export default function AdminSiteControlsTab({ refreshTrigger }) {
     setSaveSuccess(null);
     setSaveError(null);
     try {
+      const headers = await getHeaders();
       const res = await fetch('/api/admin/site-settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'same-origin',
         body: JSON.stringify(config)
       });
       const data = await res.json();
